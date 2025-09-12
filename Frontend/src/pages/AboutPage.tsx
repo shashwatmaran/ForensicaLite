@@ -1,5 +1,5 @@
 import React from 'react';
-import { Shield, Search, Database, Lock, Users, Award } from 'lucide-react';
+import { Shield, Search, Database, Lock, Users } from 'lucide-react';
 import Navbar from '../components/common/Navbar';
 import Footer from '../components/common/Footer';
 
@@ -112,17 +112,7 @@ const AboutPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Certification */}
-        <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-xl p-8 text-center">
-          <Award className="w-12 h-12 text-green-600 dark:text-green-400 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-green-900 dark:text-green-100 mb-3">
-            Industry Certified
-          </h3>
-          <p className="text-green-800 dark:text-green-200">
-            ForensicaLite follows industry-standard forensic practices and is compliant with 
-            international digital forensics guidelines including NIST and ISO 27037 standards.
-          </p>
-        </div>
+        
 
         {/* Disclaimer */}
         <div className="mt-16 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg p-6">

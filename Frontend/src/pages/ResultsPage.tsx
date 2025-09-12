@@ -23,7 +23,7 @@ const ResultsPage: React.FC = () => {
       <div className="flex">
         <Sidebar />
         
-        <main className="flex-1 p-6 space-y-8">
+        <main className="flex-1 p-6 space-y-10 md:space-y-12">
           <div className="max-w-7xl mx-auto">
             <div className="mb-8">
               <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
@@ -35,19 +35,29 @@ const ResultsPage: React.FC = () => {
             </div>
 
             {/* Summary */}
-            <Summary data={caseData} />
+            <div className="mb-6 md:mb-8">
+              <Summary data={caseData} />
+            </div>
 
             {/* Timeline */}
-            <Timeline events={caseData.timeline} />
+            <div className="mb-6 md:mb-8">
+              <Timeline events={caseData.timeline} />
+            </div>
 
             {/* Statistics */}
-            <Statistics statistics={caseData.statistics} />
+            <div className="mb-6 md:mb-8">
+              <Statistics statistics={caseData.statistics} />
+            </div>
 
             {/* Suspicious Findings */}
-            <SuspiciousFindings findings={caseData.suspiciousFindings} />
+            <div className="mb-6 md:mb-8">
+              <SuspiciousFindings findings={caseData.suspiciousFindings} />
+            </div>
 
             {/* File Explorer */}
-            <FileExplorer files={caseData.files} />
+            <div>
+              <FileExplorer files={caseData.files} />
+            </div>
           </div>
         </main>
       </div>

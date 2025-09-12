@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Upload, FileText, AlertCircle } from 'lucide-react';
-import { validateJSON } from '../../utils/validators';
+import { safeNormalizeForensicCase } from '../../utils/normalizers';
 import { ForensicCase } from '../../types';
 
 interface FileUploadProps {
@@ -13,17 +13,15 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUpload }) => {
 
   const handleFileRead = (content: string) => {
     setError(null);
-    
-    if (!validateJSON(content)) {
-      setError('Invalid JSON format. Please ensure the file contains valid forensic analysis results.');
+    const { data, error } = safeNormalizeForensicCase(content);
+    if (error) {
+      setError(error);
       return;
     }
-
-    try {
-      const data = JSON.parse(content);
+    if (data) {
       onUpload(data);
-    } catch (err) {
-      setError('Failed to parse JSON file.');
+    } else {
+      setError('Unexpected error processing file.');
     }
   };
 

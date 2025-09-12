@@ -6,22 +6,36 @@ import Footer from '../components/common/Footer';
 import FileUpload from '../components/common/FileUpload';
 import { useAppContext } from '../context/AppContext';
 import { ForensicCase } from '../types';
+import { api } from '../utils/api';
 
 const LandingPage: React.FC = () => {
   const navigate = useNavigate();
   const { setCaseData } = useAppContext();
   const [showUpload, setShowUpload] = useState(false);
 
-  const handleDownloadEXE = () => {
-    // In a real app, this would trigger the actual EXE download
-    const link = document.createElement('a');
-    link.href = '/forensic-analyzer.exe'; // This would be the actual EXE file
-    link.download = 'forensic-analyzer.exe';
-    link.click();
-    
-    // Navigate to waiting page
-    navigate('/waiting');
+  const handleDownloadEXE = async () => {
+    try {
+      // 1. Call backend to create new case using centralized API
+      const data = await api.createCase();
+      const caseId = data.caseId;
+  
+      // 2. Save caseId for later
+      localStorage.setItem("caseId", caseId);
+  
+      // 3. Trigger EXE download
+      const link = document.createElement("a");
+      link.href = "/forensic-analyzer.exe"; // replace with your actual exe path
+      link.download = "forensic-analyzer.exe";
+      link.click();
+  
+      // 4. Go to waiting page
+      navigate("/waiting");
+    } catch (err) {
+      console.error(err);
+      alert("Something went wrong while starting analysis");
+    }
   };
+  
 
   const handleJSONUpload = (data: ForensicCase) => {
     setCaseData(data);
