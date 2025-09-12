@@ -1,0 +1,29 @@
+{
+    "caseId": "1757642862901",
+    "summary": "Mock forensic analysis",
+    "files": [
+      { "name": "file1.txt", "size": 123 }
+    ],
+    "timeline": [
+      { "timestamp": "2025-09-09T12:00:00Z", "event": "Case created" }
+    ],
+    "statistics": {
+      "fileTypes": {
+        "documents": 10,
+        "images": 5,
+        "videos": 2,
+        "executables": 1,
+        "others": 3
+      },
+      "fileSizes": {
+        "small": 12,
+        "medium": 6,
+        "large": 3
+      }
+    },
+    "suspiciousFindings": [
+      "Suspicious login",
+      "Encrypted file"
+    ]
+  }
+  

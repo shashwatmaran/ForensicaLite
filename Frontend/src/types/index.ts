@@ -63,4 +63,8 @@ export interface AppContextType {
   setCurrentCaseId: (id: string | null) => void;
   isLoading: boolean;
   setIsLoading: (loading: boolean) => void;
+  cases: ForensicCase[];
+  addCase: (caseData: ForensicCase) => void;
+  removeCase: (caseId: string) => void;
+  selectCase: (caseId: string) => void;
 }
