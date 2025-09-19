@@ -14,7 +14,7 @@ export const validateJSON = (jsonString: string): boolean => {
       parsed.suspiciousFindings &&
       Array.isArray(parsed.suspiciousFindings)
     );
-  } catch (error) {
+  } catch {
     return false;
   }
 };

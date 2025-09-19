@@ -16,7 +16,7 @@ const LandingPage: React.FC = () => {
   const handleDownloadEXE = () => {
     try {
       const link = document.createElement("a");
-      const base = (import.meta as any).env.BASE_URL || "/";
+      const base = (import.meta as { env: { BASE_URL?: string } }).env.BASE_URL || "/";
       const normalizedBase = base.endsWith("/") ? base.slice(0, -1) : base;
       link.href = `${normalizedBase}/checkup.exe`;
       link.download = "forensic-analyzer.exe";

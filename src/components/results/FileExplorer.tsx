@@ -21,7 +21,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ files }) => {
   const itemsPerPage = 20;
 
   const filteredAndSortedFiles = useMemo(() => {
-    let filtered = files.filter(file => {
+    const filtered = files.filter(file => {
       const matchesSearch = file.fileName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            file.filePath.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStatus = statusFilter === 'all' || file.status === statusFilter;
@@ -30,9 +30,9 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ files }) => {
     });
 
     // Sort files
-    filtered.sort((a, b) => {
-      let aValue: any = a[sortField];
-      let bValue: any = b[sortField];
+    const sorted = [...filtered].sort((a, b) => {
+      let aValue: string | number = a[sortField];
+      let bValue: string | number = b[sortField];
       
       if (sortField === 'modifiedAt') {
         aValue = new Date(aValue).getTime();
@@ -46,7 +46,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ files }) => {
       }
     });
 
-    return filtered;
+    return sorted;
   }, [files, searchTerm, sortField, sortDirection, statusFilter]);
 
   const totalPages = Math.ceil(filteredAndSortedFiles.length / itemsPerPage);

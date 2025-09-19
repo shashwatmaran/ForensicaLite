@@ -2,12 +2,8 @@ import React from 'react';
 import { 
   Calendar, 
   HardDrive, 
-  FileText, 
-  AlertTriangle, 
   Trash2, 
-  Eye,
-  Download,
-  MoreVertical
+  Eye
 } from 'lucide-react';
 import { ForensicCase } from '../../types';
 
@@ -32,23 +28,7 @@ const CasesDashboard: React.FC<CasesDashboardProps> = ({
     });
   };
 
-  const formatFileSize = (bytes: number) => {
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    if (bytes === 0) return '0 B';
-    const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
-  };
-
-  const getSeverityColor = (severity: 'low' | 'medium' | 'high') => {
-    switch (severity) {
-      case 'high': return 'text-red-600 dark:text-red-400';
-      case 'medium': return 'text-yellow-600 dark:text-yellow-400';
-      case 'low': return 'text-green-600 dark:text-green-400';
-      default: return 'text-gray-600 dark:text-gray-400';
-    }
-  };
-
-  const getSeverityCount = (findings: any[], severity: 'low' | 'medium' | 'high') => {
+  const getSeverityCount = (findings: { severity: 'low' | 'medium' | 'high' }[], severity: 'low' | 'medium' | 'high') => {
     return findings.filter(f => f.severity === severity).length;
   };
 
