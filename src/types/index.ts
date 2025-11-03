@@ -28,6 +28,7 @@ export interface TimelineEvent {
   event: 'file_created' | 'file_deleted' | 'file_modified';
   fileName: string;
   timestamp: string;
+  count?: number;
 }
 
 export interface Statistics {

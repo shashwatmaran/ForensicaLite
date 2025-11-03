@@ -34,20 +34,22 @@ const Timeline: React.FC<TimelineProps> = ({ events }) => {
   const { theme } = useTheme();
   const chartRef = useRef<ChartJS<'line'>>(null);
 
-  // Process timeline data for chart
+  // Process timeline data for chart (sum provided counts if present)
   const processedData = React.useMemo(() => {
     const eventCounts: Record<string, { created: number; deleted: number; modified: number }> = {};
-    
+
     events.forEach(event => {
       const date = new Date(event.timestamp).toDateString();
       if (!eventCounts[date]) {
         eventCounts[date] = { created: 0, deleted: 0, modified: 0 };
       }
-      eventCounts[date][event.event.replace('file_', '') as keyof typeof eventCounts[string]]++;
+      const key = event.event.replace('file_', '') as 'created' | 'deleted' | 'modified';
+      const inc = typeof event.count === 'number' ? event.count : 1;
+      eventCounts[date][key] += inc;
     });
 
     const sortedDates = Object.keys(eventCounts).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
-    
+
     return {
       labels: sortedDates,
       datasets: [
