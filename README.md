@@ -1,8 +1,24 @@
 # ForensicaLite
 
-A forensic analysis tool built with React, TypeScript, and Vite.
+A professional digital forensics analysis platform for comprehensive disk examination, file recovery, and security assessment. Built with React, TypeScript, and Vite.
 
-## Development
+## How It Works
+
+ForensicaLite follows a two-step workflow:
+
+1. **Download & Run the Analyzer** — Download `checkup.exe` from the web app and run it as Administrator on the target Windows system. It performs a deep forensic scan and outputs a structured JSON report.
+2. **Upload & Visualize** — Upload the generated JSON file to the web app to view an interactive forensic report with timelines, file explorer, statistics, and suspicious findings.
+
+## Features
+
+- 🔍 **Deep System Scan** — Comprehensive disk analysis including deleted files and hidden data
+- 📊 **Visual Analytics** — Interactive charts and timelines for file activity patterns
+- ⚠️ **Threat Detection** — Identifies suspicious files and potential security risks
+- 🔒 **Secure & Local** — All analysis is performed locally; no data leaves your machine
+- 📁 **File Explorer** — Browse and inspect analyzed files with metadata
+- 📋 **Case Dashboard** — Manage and compare multiple forensic cases
+
+## Getting Started
 
 ```bash
 # Install dependencies
@@ -18,51 +34,47 @@ npm run build
 npm run preview
 ```
 
-## Deployment to GitHub Pages
+## Deployment (GitHub Pages)
 
-This project is configured for automatic deployment to GitHub Pages using GitHub Actions.
+This project is configured for automatic deployment to GitHub Pages via GitHub Actions.
 
-### Automatic Deployment
+1. Push to the `main` branch
+2. GitHub Actions will build and deploy automatically
+3. Site will be live at: `https://<your-username>.github.io/ForensicaLite/`
 
-1. Push your code to the `main` branch
-2. GitHub Actions will automatically build and deploy your site
-3. Your site will be available at: `https://[your-username].github.io/ForensicaLite/`
-
-### Manual Deployment
-
-If you prefer to deploy manually:
-
-```bash
-# Install dependencies (if not already done)
-npm install
-
-# Deploy to GitHub Pages
-npm run deploy
-```
-
-### GitHub Pages Setup
-
-1. Go to your repository on GitHub
-2. Navigate to Settings > Pages
-3. Under "Source", select "GitHub Actions"
-4. The workflow will automatically deploy when you push to the main branch
+To set up GitHub Pages:
+- Go to **Settings → Pages**
+- Set source to **GitHub Actions**
 
 ## Project Structure
 
-- `src/` - Source code
-- `src/components/` - React components
-- `src/pages/` - Page components
-- `src/context/` - React context providers
-- `src/utils/` - Utility functions
-- `src/types/` - TypeScript type definitions
-- `public/` - Static assets
+```
+src/
+├── components/
+│   ├── common/          # Navbar, Footer, FileUpload
+│   └── results/         # CasesDashboard, FileExplorer, Statistics,
+│                        # Summary, SuspiciousFindings, Timeline
+├── context/             # App-wide state (AppContext)
+├── pages/               # LandingPage, ResultsPage, AboutPage
+├── types/               # TypeScript type definitions
+└── utils/               # Data formatters and normalizers
+public/
+└── checkup.exe          # Forensic analyzer binary
+```
 
-## Technologies Used
+## Tech Stack
 
-- React 18
-- TypeScript
-- Vite
-- Tailwind CSS
-- React Router
-- Chart.js
-- Lucide React Icons
+| Technology | Purpose |
+|---|---|
+| React 18 | UI framework |
+| TypeScript | Type safety |
+| Vite | Build tool & dev server |
+| Tailwind CSS | Styling |
+| React Router v7 | Client-side routing |
+| Chart.js + react-chartjs-2 | Data visualization |
+| date-fns | Date formatting |
+| Lucide React | Icons |
+
+## Legal Disclaimer
+
+ForensicaLite is intended for **legitimate forensic analysis, security assessment, and educational purposes only**. Users must ensure they have proper legal authorization before analyzing any system, device, or data. Unauthorized access to computer systems may violate local, state, and federal laws. The developers are not responsible for any misuse of this software.
