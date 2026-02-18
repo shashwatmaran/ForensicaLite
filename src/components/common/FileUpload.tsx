@@ -42,7 +42,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUpload }) => {
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
-    
+
     const files = Array.from(e.dataTransfer.files);
     if (files.length > 0) {
       handleFileSelect(files[0]);
@@ -59,11 +59,10 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUpload }) => {
   return (
     <div className="w-full max-w-lg">
       <div
-        className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-          dragOver
-            ? 'border-blue-400 bg-blue-50 dark:bg-blue-950/20'
-            : 'border-gray-300 dark:border-slate-600 hover:border-blue-400 dark:hover:border-blue-400'
-        }`}
+        className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${dragOver
+            ? 'border-forest-400 bg-forest-50 dark:bg-forest-950/20'
+            : 'border-gray-300 dark:border-slate-600 hover:border-forest-400 dark:hover:border-forest-400'
+          }`}
         onDragOver={(e) => {
           e.preventDefault();
           setDragOver(true);
@@ -78,7 +77,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUpload }) => {
         <p className="text-sm text-gray-600 dark:text-slate-400 mb-4">
           Drag and drop your JSON results file here, or click to browse
         </p>
-        
+
         <label className="inline-block">
           <input
             type="file"
@@ -86,13 +85,13 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUpload }) => {
             onChange={handleChange}
             className="hidden"
           />
-          <span className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg cursor-pointer transition-colors inline-flex items-center space-x-2">
+          <span className="bg-forest-600 hover:bg-forest-700 text-white px-4 py-2 rounded-lg cursor-pointer transition-colors inline-flex items-center space-x-2">
             <FileText className="w-4 h-4" />
             <span>Choose File</span>
           </span>
         </label>
       </div>
-      
+
       {error && (
         <div className="mt-4 p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg">
           <div className="flex items-center space-x-2">

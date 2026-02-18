@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Search, ArrowUpDown, File, Trash2 } from 'lucide-react';
 import { ForensicFile } from '../../types';
 import { formatFileSize, formatDate } from '../../utils/formatters';
@@ -17,37 +17,37 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ files }) => {
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [currentPage, setCurrentPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'deleted'>('all');
-  
+
   const itemsPerPage = 20;
 
   const filteredAndSortedFiles = useMemo(() => {
     const filtered = files.filter(file => {
-      const matchesSearch = file.fileName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           file.filePath.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearch =
+        file.fileName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        file.filePath.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStatus = statusFilter === 'all' || file.status === statusFilter;
-      
       return matchesSearch && matchesStatus;
     });
 
-    // Sort files
     const sorted = [...filtered].sort((a, b) => {
       let aValue: string | number = a[sortField];
       let bValue: string | number = b[sortField];
-      
+
       if (sortField === 'modifiedAt') {
         aValue = new Date(aValue).getTime();
         bValue = new Date(bValue).getTime();
       }
-      
-      if (sortDirection === 'asc') {
-        return aValue > bValue ? 1 : -1;
-      } else {
-        return aValue < bValue ? 1 : -1;
-      }
+
+      return sortDirection === 'asc' ? (aValue > bValue ? 1 : -1) : (aValue < bValue ? 1 : -1);
     });
 
     return sorted;
   }, [files, searchTerm, sortField, sortDirection, statusFilter]);
+
+  // Reset to page 1 whenever the search term or status filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter]);
 
   const totalPages = Math.ceil(filteredAndSortedFiles.length / itemsPerPage);
   const paginatedFiles = filteredAndSortedFiles.slice(
@@ -67,12 +67,12 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ files }) => {
   const SortButton: React.FC<{ field: SortField; children: React.ReactNode }> = ({ field, children }) => (
     <button
       onClick={() => handleSort(field)}
-      className="flex items-center space-x-1 text-left font-medium text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400"
+      className="flex items-center space-x-1 text-left font-medium text-gray-900 dark:text-white hover:text-forest-600 dark:hover:text-forest-400"
     >
       <span>{children}</span>
       <ArrowUpDown className={clsx(
         'w-4 h-4',
-        sortField === field ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400'
+        sortField === field ? 'text-forest-600 dark:text-forest-400' : 'text-gray-400'
       )} />
     </button>
   );
@@ -82,7 +82,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ files }) => {
       <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">
         File Explorer
       </h2>
-      
+
       {/* Filters and Search */}
       <div className="flex flex-col sm:flex-row gap-4 mb-6">
         <div className="flex-1 relative">
@@ -92,14 +92,14 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ files }) => {
             placeholder="Search files..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-slate-400 focus:ring-2 focus:ring-forest-500 focus:border-transparent"
           />
         </div>
-        
+
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'deleted')}
-          className="px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-forest-500 focus:border-transparent"
         >
           <option value="all">All Files</option>
           <option value="active">Active Files</option>
@@ -112,97 +112,106 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ files }) => {
         Showing {paginatedFiles.length} of {filteredAndSortedFiles.length} files
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-gray-200 dark:border-slate-600">
-              <th className="text-left py-3 px-4">
-                <SortButton field="fileName">File Name</SortButton>
-              </th>
-              <th className="text-left py-3 px-4">Path</th>
-              <th className="text-left py-3 px-4">
-                <SortButton field="fileSize">Size</SortButton>
-              </th>
-              <th className="text-left py-3 px-4">
-                <SortButton field="modifiedAt">Modified</SortButton>
-              </th>
-              <th className="text-left py-3 px-4">
-                <SortButton field="status">Status</SortButton>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {paginatedFiles.map((file, index) => (
-              <tr
-                key={`${file.filePath}/${file.fileName}-${index}`}
-                className="border-b border-gray-100 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700/50"
-              >
-                <td className="py-3 px-4">
-                  <div className="flex items-center space-x-2">
-                    {file.status === 'deleted' ? (
-                      <Trash2 className="w-4 h-4 text-red-500" />
-                    ) : (
-                      <File className="w-4 h-4 text-gray-500" />
-                    )}
-                    <span className={clsx(
-                      'font-medium',
-                      file.status === 'deleted' 
-                        ? 'text-red-600 dark:text-red-400 line-through' 
-                        : 'text-gray-900 dark:text-white'
-                    )}>
-                      {file.fileName}
-                    </span>
-                  </div>
-                </td>
-                <td className="py-3 px-4 text-sm text-gray-600 dark:text-slate-400 max-w-xs truncate">
-                  {file.filePath}
-                </td>
-                <td className="py-3 px-4 text-sm text-gray-900 dark:text-white">
-                  {formatFileSize(file.fileSize)}
-                </td>
-                <td className="py-3 px-4 text-sm text-gray-600 dark:text-slate-400">
-                  {formatDate(file.modifiedAt)}
-                </td>
-                <td className="py-3 px-4">
-                  <span className={clsx(
-                    'px-2 py-1 text-xs font-medium rounded-full',
-                    file.status === 'active'
-                      ? 'bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-400'
-                      : 'bg-red-100 dark:bg-red-950/30 text-red-700 dark:text-red-400'
-                  )}>
-                    {file.status}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-6">
-          <button
-            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-            disabled={currentPage === 1}
-            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-slate-300 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Previous
-          </button>
-          
-          <span className="text-sm text-gray-600 dark:text-slate-400">
-            Page {currentPage} of {totalPages}
-          </span>
-          
-          <button
-            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-            disabled={currentPage === totalPages}
-            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-slate-300 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Next
-          </button>
+      {filteredAndSortedFiles.length === 0 ? (
+        <div className="text-center py-16">
+          <Search className="w-12 h-12 text-gray-300 dark:text-slate-600 mx-auto mb-4" />
+          <p className="text-gray-500 dark:text-slate-400 font-medium">No files match your search</p>
+          <p className="text-sm text-gray-400 dark:text-slate-500 mt-1">Try adjusting your search term or filter</p>
         </div>
+      ) : (
+        <>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-200 dark:border-slate-600">
+                  <th className="text-left py-3 px-4">
+                    <SortButton field="fileName">File Name</SortButton>
+                  </th>
+                  <th className="text-left py-3 px-4">Path</th>
+                  <th className="text-left py-3 px-4">
+                    <SortButton field="fileSize">Size</SortButton>
+                  </th>
+                  <th className="text-left py-3 px-4">
+                    <SortButton field="modifiedAt">Modified</SortButton>
+                  </th>
+                  <th className="text-left py-3 px-4">
+                    <SortButton field="status">Status</SortButton>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedFiles.map((file, index) => (
+                  <tr
+                    key={`${file.filePath}/${file.fileName}-${index}`}
+                    className="border-b border-gray-100 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700/50"
+                  >
+                    <td className="py-3 px-4">
+                      <div className="flex items-center space-x-2">
+                        {file.status === 'deleted' ? (
+                          <Trash2 className="w-4 h-4 text-red-500" />
+                        ) : (
+                          <File className="w-4 h-4 text-gray-500" />
+                        )}
+                        <span className={clsx(
+                          'font-medium',
+                          file.status === 'deleted'
+                            ? 'text-red-600 dark:text-red-400 line-through'
+                            : 'text-gray-900 dark:text-white'
+                        )}>
+                          {file.fileName}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="py-3 px-4 text-sm text-gray-600 dark:text-slate-400 max-w-xs truncate">
+                      {file.filePath}
+                    </td>
+                    <td className="py-3 px-4 text-sm text-gray-900 dark:text-white">
+                      {formatFileSize(file.fileSize)}
+                    </td>
+                    <td className="py-3 px-4 text-sm text-gray-600 dark:text-slate-400">
+                      {formatDate(file.modifiedAt)}
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className={clsx(
+                        'px-2 py-1 text-xs font-medium rounded-full',
+                        file.status === 'active'
+                          ? 'bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-400'
+                          : 'bg-red-100 dark:bg-red-950/30 text-red-700 dark:text-red-400'
+                      )}>
+                        {file.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-6">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-slate-300 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+
+              <span className="text-sm text-gray-600 dark:text-slate-400">
+                Page {currentPage} of {totalPages}
+              </span>
+
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-slate-300 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

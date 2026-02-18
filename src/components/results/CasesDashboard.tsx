@@ -1,23 +1,29 @@
-import React from 'react';
-import { 
-  Calendar, 
-  HardDrive, 
-  Trash2, 
-  Eye
+import React, { useState } from 'react';
+import {
+  Calendar,
+  HardDrive,
+  Trash2,
+  Eye,
+  Plus,
+  X,
 } from 'lucide-react';
 import { ForensicCase } from '../../types';
+import FileUpload from '../common/FileUpload';
 
 interface CasesDashboardProps {
   cases: ForensicCase[];
   onSelectCase: (caseId: string) => void;
   onRemoveCase: (caseId: string) => void;
+  onAddCase: (data: ForensicCase) => void;
 }
 
-const CasesDashboard: React.FC<CasesDashboardProps> = ({ 
-  cases, 
-  onSelectCase, 
-  onRemoveCase 
+const CasesDashboard: React.FC<CasesDashboardProps> = ({
+  cases,
+  onSelectCase,
+  onRemoveCase,
+  onAddCase,
 }) => {
+  const [showAddCase, setShowAddCase] = useState(false);
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -42,8 +48,8 @@ const CasesDashboard: React.FC<CasesDashboardProps> = ({
         <p className="text-gray-600 dark:text-slate-400 mb-6">
           Upload forensic analysis results or run the analyzer to see your cases here.
         </p>
-        <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 max-w-md mx-auto">
-          <p className="text-sm text-blue-800 dark:text-blue-200">
+        <div className="bg-forest-50 dark:bg-forest-950/20 border border-forest-200 dark:border-forest-800 rounded-lg p-4 max-w-md mx-auto">
+          <p className="text-sm text-forest-800 dark:text-forest-200">
             💡 Start by uploading a JSON file or downloading the analyzer tool from the home page.
           </p>
         </div>
@@ -62,7 +68,21 @@ const CasesDashboard: React.FC<CasesDashboardProps> = ({
             {cases.length} case{cases.length !== 1 ? 's' : ''} analyzed
           </p>
         </div>
+        <button
+          onClick={() => setShowAddCase(prev => !prev)}
+          className="inline-flex items-center space-x-2 px-4 py-2 bg-forest-600 hover:bg-forest-700 dark:bg-forest-700 dark:hover:bg-forest-800 text-white font-medium rounded-lg transition-colors"
+        >
+          {showAddCase ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+          <span>{showAddCase ? 'Cancel' : 'Add Case'}</span>
+        </button>
       </div>
+
+      {showAddCase && (
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Upload Analysis Results</h3>
+          <FileUpload onUpload={(data) => { onAddCase(data); setShowAddCase(false); }} />
+        </div>
+      )}
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {cases.map((caseData) => (
@@ -73,8 +93,8 @@ const CasesDashboard: React.FC<CasesDashboardProps> = ({
             {/* Header */}
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center space-x-3">
-                <div className="p-2 bg-blue-100 dark:bg-blue-950/30 rounded-lg">
-                  <HardDrive className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                <div className="p-2 bg-forest-100 dark:bg-forest-950/30 rounded-lg">
+                  <HardDrive className="w-5 h-5 text-forest-600 dark:text-forest-400" />
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-900 dark:text-white">
@@ -85,11 +105,11 @@ const CasesDashboard: React.FC<CasesDashboardProps> = ({
                   </p>
                 </div>
               </div>
-              
+
               <div className="flex items-center space-x-1">
                 <button
                   onClick={() => onSelectCase(caseData.caseId)}
-                  className="p-1.5 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                  className="p-1.5 text-gray-400 hover:text-forest-600 dark:hover:text-forest-400 transition-colors"
                   title="View Details"
                 >
                   <Eye className="w-4 h-4" />
@@ -114,7 +134,7 @@ const CasesDashboard: React.FC<CasesDashboardProps> = ({
                   Total Files
                 </div>
               </div>
-              
+
               <div className="text-center p-3 bg-gray-50 dark:bg-slate-700 rounded-lg">
                 <div className="text-2xl font-bold text-red-600 dark:text-red-400">
                   {caseData.summary.deletedFiles.toLocaleString()}
@@ -165,7 +185,7 @@ const CasesDashboard: React.FC<CasesDashboardProps> = ({
             {/* Action Button */}
             <button
               onClick={() => onSelectCase(caseData.caseId)}
-              className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+              className="w-full mt-4 bg-forest-600 hover:bg-forest-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
             >
               View Full Report
             </button>

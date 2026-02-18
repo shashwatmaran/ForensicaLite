@@ -28,24 +28,24 @@ const AboutPage: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-950 dark:to-slate-900">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-forest-50 dark:from-slate-950 dark:to-forest-950">
       <Navbar />
-      
+
       <main className="container mx-auto px-6 py-12">
         {/* Hero Section */}
         <div className="text-center mb-16">
           <div className="flex justify-center mb-6">
-            <div className="p-4 bg-blue-100 dark:bg-blue-950/30 rounded-full">
-              <Shield className="w-16 h-16 text-blue-600 dark:text-blue-400" />
+            <div className="p-4 bg-forest-100 dark:bg-forest-950/30 rounded-full">
+              <Shield className="w-16 h-16 text-forest-600 dark:text-forest-400" />
             </div>
           </div>
-          
+
           <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-6">
             About ForensicaLite
           </h1>
-          
+
           <p className="text-xl text-gray-600 dark:text-slate-400 max-w-3xl mx-auto">
-            Professional digital forensics analysis platform designed for comprehensive disk examination, 
+            Professional digital forensics analysis platform designed for comprehensive disk examination,
             evidence collection, and security assessment by cybersecurity professionals.
           </p>
         </div>
@@ -59,8 +59,8 @@ const AboutPage: React.FC = () => {
                 key={feature.title}
                 className="bg-white dark:bg-slate-800 p-8 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700"
               >
-                <div className="p-3 bg-blue-100 dark:bg-blue-950/30 rounded-lg w-fit mb-4">
-                  <Icon className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+                <div className="p-3 bg-forest-100 dark:bg-forest-950/30 rounded-lg w-fit mb-4">
+                  <Icon className="w-8 h-8 text-forest-600 dark:text-forest-400" />
                 </div>
                 <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
                   {feature.title}
@@ -78,31 +78,31 @@ const AboutPage: React.FC = () => {
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
             Our Methodology
           </h2>
-          
+
           <div className="grid md:grid-cols-3 gap-6">
             <div className="text-center">
-              <div className="w-12 h-12 bg-blue-100 dark:bg-blue-950/30 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-xl font-bold text-blue-600 dark:text-blue-400">1</span>
+              <div className="w-12 h-12 bg-forest-100 dark:bg-forest-950/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-xl font-bold text-forest-600 dark:text-forest-400">1</span>
               </div>
               <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Data Acquisition</h3>
               <p className="text-sm text-gray-600 dark:text-slate-400">
                 Secure, forensically sound data acquisition preserving evidence integrity throughout the process.
               </p>
             </div>
-            
+
             <div className="text-center">
-              <div className="w-12 h-12 bg-blue-100 dark:bg-blue-950/30 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-xl font-bold text-blue-600 dark:text-blue-400">2</span>
+              <div className="w-12 h-12 bg-forest-100 dark:bg-forest-950/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-xl font-bold text-forest-600 dark:text-forest-400">2</span>
               </div>
               <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Deep Analysis</h3>
               <p className="text-sm text-gray-600 dark:text-slate-400">
                 Comprehensive examination using advanced algorithms for file carving, timeline analysis, and anomaly detection.
               </p>
             </div>
-            
+
             <div className="text-center">
-              <div className="w-12 h-12 bg-blue-100 dark:bg-blue-950/30 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-xl font-bold text-blue-600 dark:text-blue-400">3</span>
+              <div className="w-12 h-12 bg-forest-100 dark:bg-forest-950/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-xl font-bold text-forest-600 dark:text-forest-400">3</span>
               </div>
               <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Report Generation</h3>
               <p className="text-sm text-gray-600 dark:text-slate-400">
@@ -112,7 +112,7 @@ const AboutPage: React.FC = () => {
           </div>
         </div>
 
-        
+
 
         {/* Disclaimer */}
         <div className="mt-16 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg p-6">
@@ -128,13 +128,13 @@ const AboutPage: React.FC = () => {
               Unauthorized access to computer systems and data may violate local, state, and federal laws.
             </p>
             <p>
-              The developers and distributors of ForensicaLite are not responsible for any misuse of this software 
+              The developers and distributors of ForensicaLite are not responsible for any misuse of this software
               or any legal consequences resulting from its use.
             </p>
           </div>
         </div>
       </main>
-      
+
       <Footer />
     </div>
   );
