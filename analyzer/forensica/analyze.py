@@ -10,9 +10,11 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import json
 import os
 import socket
 import time
+from pathlib import Path
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
@@ -902,6 +904,50 @@ def run_scan(
                 "entries": timeline,
             },
         }
+
+
+def write_case_file(case: Dict[str, Any], destination: Path) -> int:
+    """
+    Serialise, write atomically, and verify. Returns the byte count written.
+
+    Three deliberate steps, each closing a way to produce a file that looks
+    like a case but is not one:
+
+      Serialise first. If encoding the report fails, an existing case file at
+      that path is left untouched rather than truncated to nothing.
+
+      Write to a temporary name, then rename. os.replace is atomic on Windows
+      and POSIX, so a reader either sees the previous file or the complete new
+      one — never a half-written or zero-byte one, even if the process dies
+      mid-write.
+
+      Re-read and parse. Proves what actually landed on disk is loadable,
+      rather than trusting that the write did what was asked.
+    """
+    # Encoded and written as bytes, never text mode: Windows would translate
+    # every \n to \r\n on the way out. A case file is an evidence artifact, and
+    # its bytes should be what the analyzer produced, not what the host's line
+    # ending convention preferred — otherwise the same scan hashes differently
+    # on different platforms.
+    payload = (json.dumps(case, indent=2) + "\n").encode("utf-8")
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary = destination.with_name(destination.name + ".partial")
+
+    try:
+        with open(temporary, "wb") as handle:
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, destination)
+    except OSError:
+        temporary.unlink(missing_ok=True)
+        raise
+
+    verification = destination.read_bytes()
+    json.loads(verification.decode("utf-8"))  # raises if truncated or malformed
+
+    return len(payload)
 
 
 def _iso_to_filetime(iso: str) -> int:

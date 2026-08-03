@@ -297,6 +297,76 @@ def test_case_file_is_json_serialisable(case):
     assert json.loads(json.dumps(case))["schemaVersion"] == SCHEMA_VERSION
 
 
+# ---------------------------------------------------------------------------
+# Writing the case file
+# ---------------------------------------------------------------------------
+
+
+def test_write_case_file_round_trips(case, tmp_path):
+    from forensica.analyze import write_case_file
+
+    destination = tmp_path / "out" / "case.json"  # parent does not exist yet
+    written = write_case_file(case, destination)
+
+    assert destination.exists()
+    assert written == len(destination.read_bytes())
+    assert json.loads(destination.read_text(encoding="utf-8"))["schemaVersion"] == SCHEMA_VERSION
+
+
+def test_case_file_bytes_are_not_line_ending_translated(case, tmp_path):
+    """
+    Text-mode writes turn every \\n into \\r\\n on Windows, so the same scan
+    would hash differently per platform. The bytes must be the analyzer's.
+    """
+    from forensica.analyze import write_case_file
+
+    destination = tmp_path / "case.json"
+    write_case_file(case, destination)
+
+    assert b"\r\n" not in destination.read_bytes()
+
+
+def test_write_case_file_leaves_no_partial_behind(case, tmp_path):
+    from forensica.analyze import write_case_file
+
+    destination = tmp_path / "case.json"
+    write_case_file(case, destination)
+
+    assert list(tmp_path.glob("*.partial")) == []
+
+
+def test_failed_serialisation_does_not_destroy_an_existing_case(tmp_path):
+    """
+    The reason serialisation happens before the file is opened: a naive
+    open-then-write truncates the old case to zero bytes and only then
+    discovers it cannot encode the new one.
+    """
+    from forensica.analyze import write_case_file
+
+    destination = tmp_path / "case.json"
+    destination.write_text('{"schemaVersion": 1, "existing": true}\n', encoding="utf-8")
+    original = destination.read_text(encoding="utf-8")
+
+    unserialisable = {"schemaVersion": 1, "bad": {1, 2, 3}}  # a set is not JSON
+
+    with pytest.raises(TypeError):
+        write_case_file(unserialisable, destination)
+
+    assert destination.read_text(encoding="utf-8") == original
+    assert list(tmp_path.glob("*.partial")) == []
+
+
+def test_write_case_file_overwrites_atomically(case, tmp_path):
+    from forensica.analyze import write_case_file
+
+    destination = tmp_path / "case.json"
+    destination.write_text("stale contents that are not json", encoding="utf-8")
+
+    write_case_file(case, destination)
+
+    assert json.loads(destination.read_text(encoding="utf-8"))["schemaVersion"] == SCHEMA_VERSION
+
+
 def test_findings_reference_back_to_their_records(case):
     for finding in case["findings"]:
         if finding["recordNumber"] is None:

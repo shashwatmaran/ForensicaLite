@@ -13,8 +13,6 @@ so no widget is ever touched from the worker.
 
 from __future__ import annotations
 
-import json
-import os
 import queue
 import subprocess
 import sys
@@ -28,7 +26,7 @@ import tkinter as tk
 from tkinter import filedialog, ttk
 
 from . import __version__
-from .analyze import ScanOptions, run_scan
+from .analyze import ScanOptions, run_scan, write_case_file
 from .boot import NotNtfsError
 from .mft import MftParseError
 from .progress import Progress, ScanCancelled
@@ -65,6 +63,7 @@ TITLE = ("Segoe UI", 13, "bold")
 class ScanResult:
     case: Dict[str, Any]
     output_path: Path
+    bytes_written: int
 
 
 class CheckupApp:
@@ -243,52 +242,16 @@ class CheckupApp:
 
         ttk.Separator(outer, orient="horizontal").pack(fill="x", pady=(16, 0))
 
-        # --- progress ---
-        progress_frame = ttk.Frame(outer)
-        progress_frame.pack(fill="x", pady=(12, 0))
+        # Pack order matters here. The log expands to fill whatever is left, so
+        # anything packed after it gets squeezed out entirely when the content
+        # is taller than the window — which is what happened to the action bar
+        # once the elevation notice was showing. Reserving the bottom rows
+        # first, with side="bottom", guarantees they keep their space and the
+        # log takes only the remainder.
 
-        self.stage_label = ttk.Label(progress_frame, text="Idle", style="Mono.TLabel")
-        self.stage_label.pack(anchor="w")
-
-        self.progress = ttk.Progressbar(
-            progress_frame, style="Thin.Horizontal.TProgressbar", maximum=1000
-        )
-        self.progress.pack(fill="x", pady=(6, 4))
-
-        self.count_label = ttk.Label(progress_frame, text="", style="Dim.TLabel")
-        self.count_label.pack(anchor="w")
-
-        # --- log ---
-        log_frame = tk.Frame(outer, bg=BORDER, highlightthickness=0, bd=0)
-        log_frame.pack(fill="both", expand=True, pady=(12, 0))
-
-        self.log = tk.Text(
-            log_frame,
-            bg=SURFACE,
-            fg=TEXT_DIM,
-            insertbackground=TEXT,
-            font=MONO_SMALL,
-            relief="flat",
-            padx=10,
-            pady=8,
-            height=10,
-            wrap="word",
-            state="disabled",
-        )
-        self.log.pack(fill="both", expand=True, padx=1, pady=1)
-
-        for tag, colour in (
-            ("info", TEXT_DIM),
-            ("good", ACCENT_BRIGHT),
-            ("warn", SEV_HIGH),
-            ("bad", SEV_CRITICAL),
-            ("head", TEXT),
-        ):
-            self.log.tag_configure(tag, foreground=colour)
-
-        # --- actions ---
+        # --- actions (reserved at the very bottom) ---
         actions = ttk.Frame(outer)
-        actions.pack(fill="x", pady=(12, 0))
+        actions.pack(side="bottom", fill="x", pady=(12, 0))
 
         self.scan_button = ttk.Button(
             actions, text="Start scan", style="Accent.TButton", command=self._start_scan
@@ -307,6 +270,51 @@ class CheckupApp:
 
         self.status_label = ttk.Label(actions, text="", style="Dim.TLabel")
         self.status_label.pack(side="left", padx=(12, 0))
+
+        # --- progress (reserved above the actions) ---
+        progress_frame = ttk.Frame(outer)
+        progress_frame.pack(side="bottom", fill="x", pady=(12, 0))
+
+        self.stage_label = ttk.Label(progress_frame, text="Idle", style="Mono.TLabel")
+        self.stage_label.pack(anchor="w")
+
+        self.progress = ttk.Progressbar(
+            progress_frame, style="Thin.Horizontal.TProgressbar", maximum=1000
+        )
+        self.progress.pack(fill="x", pady=(6, 4))
+
+        self.count_label = ttk.Label(progress_frame, text="", style="Dim.TLabel")
+        self.count_label.pack(anchor="w")
+
+        # --- log (fills whatever is left between progress and actions) ---
+        log_frame = tk.Frame(outer, bg=BORDER, highlightthickness=0, bd=0)
+        log_frame.pack(side="top", fill="both", expand=True, pady=(12, 0))
+
+        self.log = tk.Text(
+            log_frame,
+            bg=SURFACE,
+            fg=TEXT_DIM,
+            insertbackground=TEXT,
+            font=MONO_SMALL,
+            relief="flat",
+            padx=10,
+            pady=8,
+            # A small requested height; the pack expand above grows it. A tall
+            # request competes for space with the rows that must stay visible.
+            height=6,
+            wrap="word",
+            state="disabled",
+        )
+        self.log.pack(fill="both", expand=True, padx=1, pady=1)
+
+        for tag, colour in (
+            ("info", TEXT_DIM),
+            ("good", ACCENT_BRIGHT),
+            ("warn", SEV_HIGH),
+            ("bad", SEV_CRITICAL),
+            ("head", TEXT),
+        ):
+            self.log.tag_configure(tag, foreground=colour)
 
     def _build_elevation_notice(self) -> None:
         if is_elevated():
@@ -542,9 +550,8 @@ class CheckupApp:
                 on_progress=on_progress,
                 should_cancel=self.cancel_flag.is_set,
             )
-            output.parent.mkdir(parents=True, exist_ok=True)
-            output.write_text(json.dumps(case, indent=2) + "\n", encoding="utf-8")
-            self.events.put(("done", ScanResult(case, output)))
+            written = write_case_file(case, output)
+            self.events.put(("done", ScanResult(case, output, written)))
 
         except ScanCancelled:
             self.events.put(("cancelled", None))
@@ -633,7 +640,10 @@ class CheckupApp:
             self._append("findings  none", "good")
 
         self._append("", "info")
-        self._append(f"written   {result.output_path}", "good")
+        self._append(
+            f"written   {result.output_path}  ({result.bytes_written:,} bytes, verified)",
+            "good",
+        )
         self._append("Upload the case file at the ForensicaLite web app to view the report.")
 
         self.count_label.configure(text=f"{counts['total']:,} records examined")

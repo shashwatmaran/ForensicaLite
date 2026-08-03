@@ -18,12 +18,11 @@ from __future__ import annotations
 
 import argparse
 import ctypes
-import json
 import sys
 from pathlib import Path
 
 from forensica import __version__
-from forensica.analyze import ScanOptions, run_scan
+from forensica.analyze import ScanOptions, run_scan, write_case_file
 from forensica.boot import NotNtfsError
 from forensica.mft import MftParseError
 from forensica.volume import VolumeReadError
@@ -137,7 +136,12 @@ def main(argv: list[str] | None = None) -> int:
         return 4
 
     destination = Path(args.output) if args.output else Path(f"case-{case['scan']['caseId']}.json")
-    destination.write_text(json.dumps(case, indent=2) + "\n", encoding="utf-8")
+
+    try:
+        written = write_case_file(case, destination)
+    except OSError as error:
+        print(f"error: could not write {destination}: {error}", file=sys.stderr)
+        return 5
 
     if not args.quiet:
         statistics = case["statistics"]["fileCounts"]
@@ -152,7 +156,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"    findings  {len(case['findings'])} "
               f"({severities['critical']} critical, {severities['high']} high, "
               f"{severities['medium']} medium)")
-        print(f"    written   {destination}")
+        print(f"    written   {destination}  ({written:,} bytes, verified)")
         print()
         print("Upload the case file at the ForensicaLite web app to view the report.")
 

@@ -17,9 +17,9 @@ between analyzer and UI has been redefined.
 | Case file schema (v1) | Done — [src/types/case.ts](src/types/case.ts) |
 | Web app / report UI | Done, verified in browser |
 | Sample case fixture | Done — `npm run sample` |
-| Analyzer (`checkup.py`) | Done — 66 tests passing |
+| Analyzer (`checkup.py`) | Done — 91 tests passing |
 | Verified against a real volume | Done — 57 GB NTFS, geometry cross-checked against `fsutil` |
-| `checkup.exe` build | Built by [analyzer/build.ps1](analyzer/build.ps1); blocked by Smart App Control, see below |
+| Executables | `checkup.exe` (desktop) + `checkup-cli.exe`, built by [analyzer/build.ps1](analyzer/build.ps1) |
 
 Load the bundled sample case from the landing page to explore the report without running a scan.
 
@@ -119,7 +119,7 @@ Set up the virtual environment once:
 cd analyzer && python -m venv .venv && .venv/Scripts/python.exe -m pip install -r requirements.txt
 ```
 
-Then run the tests (84 of them, about a second, no volume or privileges needed):
+Then run the tests (91 of them, about a second, no volume or privileges needed):
 
 ```bash
 cd analyzer && .venv/Scripts/python.exe -m pytest -q

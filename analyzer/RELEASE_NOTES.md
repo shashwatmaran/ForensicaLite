@@ -18,11 +18,11 @@ black window when the GUI opens.
 ## Verify the download
 
 ```
-checkup.exe      10,592,683 bytes
-  sha256         9e40a39b8948971122f1151ca311114d7b7c1eb2854c1afbcbdeadb3b3fc31ed
+checkup.exe      10,594,782 bytes
+  sha256         6ba56d277143ce88315eee3185c227a97eb3eaf4cb16b30359a8a07d6a4855cc
 
-checkup-cli.exe   7,458,599 bytes
-  sha256         d85c765a5f09f6ec456b42d8fc3b34e458d8e99dd5b7218131b2ed271bade469
+checkup-cli.exe   7,459,723 bytes
+  sha256         b2b2f8872b963db949dab7b4f6844286553e1846f5e980c48c5c37dad21657ff
 
 Built            Python 3.12.10, PyInstaller 6.21.0
 ```
@@ -118,7 +118,7 @@ static site with no backend.
 
 ## Status
 
-Tested against a synthetic NTFS image (84 tests, including a full scan driven
+Tested against a synthetic NTFS image (91 tests, including a full scan driven
 through the desktop interface) and verified on a real 57 GB NTFS volume:
 geometry cross-checked against `fsutil`, fixups clean, both planted deletions
 recovered — one byte-for-byte from its MFT record.
