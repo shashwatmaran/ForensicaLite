@@ -15,7 +15,12 @@ import { Mono, Notice, Panel, PanelHeader } from '../components/ui/primitives';
  * already knows what the tool is for.
  */
 
-const ANALYZER_RELEASES_URL = 'https://github.com/shashwatmaran/ForensicaLite/releases/latest';
+/*
+ * The releases index rather than /releases/latest: `latest` returns 404 when
+ * there are no published releases, and also when every release is marked as a
+ * pre-release. The index always resolves.
+ */
+const ANALYZER_RELEASES_URL = 'https://github.com/shashwatmaran/ForensicaLite/releases';
 
 const LandingPage: React.FC = () => {
   const navigate = useNavigate();
