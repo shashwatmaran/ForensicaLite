@@ -3,36 +3,133 @@
 @tailwind utilities;
 
 @layer base {
-  html {
-    scroll-behavior: smooth;
+  :root {
+    color-scheme: dark;
   }
-  
+
+  html.light {
+    color-scheme: light;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
   body {
-    @apply antialiased;
+    @apply bg-ink-950 text-ink-100 font-sans text-sm antialiased;
+    /* Tabular figures everywhere: record numbers, sizes and timestamps have to
+       line up column to column to be comparable at a glance. */
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1, 'cv05' 1;
+  }
+
+  html.light body {
+    @apply bg-ink-25 text-ink-900;
+  }
+
+  /* Focus is visible and deliberate — this is a keyboard-driven tool. */
+  :focus-visible {
+    @apply outline-none ring-1 ring-accent-400/70 ring-offset-1 ring-offset-ink-950;
+  }
+
+  html.light :focus-visible {
+    @apply ring-offset-ink-25;
+  }
+
+  ::selection {
+    @apply bg-accent-500/25;
+  }
+
+  /* Thin, unobtrusive scrollbars. The default Windows bars are far too heavy
+     for a dense panel layout. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: theme('colors.ink.700') transparent;
+  }
+
+  html.light * {
+    scrollbar-color: theme('colors.ink.200') transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    @apply rounded-sm border-2 border-solid border-transparent bg-ink-700 bg-clip-content;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    @apply bg-ink-600;
+  }
+
+  html.light *::-webkit-scrollbar-thumb {
+    @apply bg-ink-200 bg-clip-content;
   }
 }
 
 @layer components {
-  .sidebar-link {
-    @apply flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors;
+  /* A panel is the only surface primitive: hairline border, one step lighter
+     than the page. No shadows, no gradients. */
+  .panel {
+    @apply rounded-md border border-ink-800 bg-ink-900;
   }
-  
-  .sidebar-link.active {
-    @apply bg-forest-600 text-white;
+
+  html.light .panel {
+    @apply border-ink-100 bg-white;
   }
-  
-  .sidebar-link:not(.active) {
-    @apply text-slate-300 hover:bg-slate-800 dark:hover:bg-slate-800/50 hover:text-white;
+
+  .panel-header {
+    @apply flex items-baseline justify-between gap-3 border-b border-ink-800 px-4 py-2.5;
+  }
+
+  html.light .panel-header {
+    @apply border-ink-100;
+  }
+
+  /* Section eyebrow: uppercase micro-label used above dense content. */
+  .eyebrow {
+    @apply text-micro font-semibold uppercase text-ink-400;
+  }
+
+  /* Key/value grid rows used throughout the report. */
+  .field-label {
+    @apply text-micro uppercase text-ink-500;
+  }
+
+  .field-value {
+    @apply text-xs text-ink-100;
+  }
+
+  html.light .field-value {
+    @apply text-ink-900;
+  }
+
+  .mono {
+    @apply font-mono text-xs;
+  }
+
+  /* Horizontal rule that reads as structure rather than decoration. */
+  .hairline {
+    @apply border-ink-800;
+  }
+
+  html.light .hairline {
+    @apply border-ink-100;
   }
 }
 
 @layer utilities {
-  .scrollbar-hide {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-  
-  .scrollbar-hide::-webkit-scrollbar {
-    display: none;
+  /* Lets a flex/grid child shrink below its content width so long paths
+     truncate instead of forcing the layout wide. */
+  .min-w-0-fix {
+    min-width: 0;
   }
 }

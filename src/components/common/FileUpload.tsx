@@ -1,104 +1,126 @@
 import React, { useState } from 'react';
-import { Upload, FileText, AlertCircle } from 'lucide-react';
-import { safeNormalizeForensicCase } from '../../utils/normalizers';
-import { ForensicCase } from '../../types';
+import clsx from 'clsx';
+import { loadCaseFile } from '../../utils/caseLoader';
+import { CaseFile } from '../../types';
+import { Button, Notice } from '../ui/primitives';
 
-interface FileUploadProps {
-  onUpload: (data: ForensicCase) => void;
-}
+/**
+ * Case file input. Drop, browse, or load the bundled sample.
+ *
+ * The sample matters more than it looks: it lets the report be explored without
+ * running a scan, which is the difference between a demo that works and one
+ * that depends on hardware being present.
+ */
 
-const FileUpload: React.FC<FileUploadProps> = ({ onUpload }) => {
+const FileUpload: React.FC<{ onUpload: (data: CaseFile) => void; compact?: boolean }> = ({
+  onUpload,
+  compact = false,
+}) => {
   const [dragOver, setDragOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadingSample, setLoadingSample] = useState(false);
 
-  const handleFileRead = (content: string) => {
-    setError(null);
-    const { data, error } = safeNormalizeForensicCase(content);
-    if (error) {
-      setError(error);
-      return;
-    }
+  const handleContent = (content: string) => {
+    const { data, error: loadError } = loadCaseFile(content);
     if (data) {
+      setError(null);
       onUpload(data);
     } else {
-      setError('Unexpected error processing file.');
+      setError(loadError ?? 'Unexpected error reading the case file.');
     }
   };
 
-  const handleFileSelect = (file: File) => {
-    if (!file.name.endsWith('.json')) {
-      setError('Please select a JSON file.');
+  const handleFile = (file: File) => {
+    if (!file.name.toLowerCase().endsWith('.json')) {
+      setError(`Expected a .json case file — got "${file.name}".`);
       return;
     }
-
     const reader = new FileReader();
-    reader.onload = (e) => {
-      const content = e.target?.result as string;
-      handleFileRead(content);
-    };
+    reader.onload = (event) => handleContent(event.target?.result as string);
+    reader.onerror = () => setError('Could not read the selected file.');
     reader.readAsText(file);
   };
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(false);
-
-    const files = Array.from(e.dataTransfer.files);
-    if (files.length > 0) {
-      handleFileSelect(files[0]);
-    }
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files && files.length > 0) {
-      handleFileSelect(files[0]);
+  const handleLoadSample = async () => {
+    setLoadingSample(true);
+    setError(null);
+    try {
+      const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+      const response = await fetch(`${base}/samples/sample-case.json`);
+      if (!response.ok) throw new Error(`sample returned HTTP ${response.status}`);
+      handleContent(await response.text());
+    } catch (err) {
+      setError(
+        `Could not load the bundled sample — ${err instanceof Error ? err.message : 'unknown error'}`
+      );
+    } finally {
+      setLoadingSample(false);
     }
   };
 
   return (
-    <div className="w-full max-w-lg">
+    <div className="space-y-3">
       <div
-        className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${dragOver
-            ? 'border-forest-400 bg-forest-50 dark:bg-forest-950/20'
-            : 'border-gray-300 dark:border-slate-600 hover:border-forest-400 dark:hover:border-forest-400'
-          }`}
-        onDragOver={(e) => {
-          e.preventDefault();
+        onDragOver={(event) => {
+          event.preventDefault();
           setDragOver(true);
         }}
         onDragLeave={() => setDragOver(false)}
-        onDrop={handleDrop}
+        onDrop={(event) => {
+          event.preventDefault();
+          setDragOver(false);
+          const files = Array.from(event.dataTransfer.files);
+          if (files.length > 0) handleFile(files[0]);
+        }}
+        className={clsx(
+          'rounded border border-dashed transition-colors',
+          compact ? 'px-4 py-4' : 'px-5 py-8',
+          dragOver
+            ? 'border-accent-500 bg-accent-500/5'
+            : 'border-ink-700 light:border-ink-200'
+        )}
       >
-        <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-          Upload Analysis Results
-        </h3>
-        <p className="text-sm text-gray-600 dark:text-slate-400 mb-4">
-          Drag and drop your JSON results file here, or click to browse
-        </p>
+        <div
+          className={clsx(
+            'flex flex-wrap items-center gap-x-4 gap-y-3',
+            compact ? 'justify-between' : 'flex-col text-center'
+          )}
+        >
+          <div className={compact ? 'min-w-0-fix' : ''}>
+            <p className="text-xs text-ink-200 light:text-ink-800">
+              Drop a case file, or browse
+            </p>
+            <p className="mt-1 font-mono text-2xs text-ink-500">
+              JSON produced by checkup &middot; schema v1
+            </p>
+          </div>
 
-        <label className="inline-block">
-          <input
-            type="file"
-            accept=".json"
-            onChange={handleChange}
-            className="hidden"
-          />
-          <span className="bg-forest-600 hover:bg-forest-700 text-white px-4 py-2 rounded-lg cursor-pointer transition-colors inline-flex items-center space-x-2">
-            <FileText className="w-4 h-4" />
-            <span>Choose File</span>
-          </span>
-        </label>
+          <div className="flex items-center gap-2">
+            <label>
+              <input
+                type="file"
+                accept=".json,application/json"
+                onChange={(event) => {
+                  const files = event.target.files;
+                  if (files && files.length > 0) handleFile(files[0]);
+                }}
+                className="hidden"
+              />
+              <span className="inline-flex cursor-pointer items-center rounded bg-accent-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-accent-500 light:bg-accent-700 light:hover:bg-accent-600">
+                Choose file
+              </span>
+            </label>
+            <Button onClick={handleLoadSample} disabled={loadingSample}>
+              {loadingSample ? 'Loading…' : 'Load sample'}
+            </Button>
+          </div>
+        </div>
       </div>
 
       {error && (
-        <div className="mt-4 p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg">
-          <div className="flex items-center space-x-2">
-            <AlertCircle className="w-5 h-5 text-red-500" />
-            <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
-          </div>
-        </div>
+        <Notice tone="warn" onDismiss={() => setError(null)}>
+          {error}
+        </Notice>
       )}
     </div>
   );

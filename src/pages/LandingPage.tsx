@@ -1,198 +1,111 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Download, Upload, Shield, Search, BarChart3, AlertTriangle } from 'lucide-react';
-import Navbar from '../components/common/Navbar';
-import Footer from '../components/common/Footer';
+import AppShell from '../components/shell/AppShell';
 import FileUpload from '../components/common/FileUpload';
+import CaseList from '../components/results/CaseList';
 import { useAppContext } from '../context/AppContext';
-import { ForensicCase } from '../types';
+import { CaseFile } from '../types';
+import { Mono, Notice, Panel, PanelHeader } from '../components/ui/primitives';
+
+/**
+ * The workspace, not a landing page.
+ *
+ * A forensic tool opens on your cases and the means to add one. There is no
+ * hero section, no feature grid and no call to action, because the person here
+ * already knows what the tool is for.
+ */
+
+const ANALYZER_RELEASES_URL = 'https://github.com/shashwatmaran/ForensicaLite/releases/latest';
 
 const LandingPage: React.FC = () => {
   const navigate = useNavigate();
-  const { addCase } = useAppContext();
-  const [showUpload, setShowUpload] = useState(false);
+  const { cases, addCase, removeCase, selectCase, storageError, dismissStorageError } =
+    useAppContext();
 
-  // Reset upload panel when navigating back to this page
-  useEffect(() => {
-    setShowUpload(false);
-  }, []);
-
-  // ✅ New flow: only handle EXE download
-  const handleDownloadEXE = () => {
-    try {
-      const link = document.createElement("a");
-      const base = (import.meta as { env: { BASE_URL?: string } }).env.BASE_URL || "/";
-      const normalizedBase = base.endsWith("/") ? base.slice(0, -1) : base;
-      link.href = `${normalizedBase}/checkup.exe`;
-      link.download = "forensic-analyzer.exe";
-      link.click();
-    } catch (err) {
-      console.error(err);
-      alert("Something went wrong while downloading the analyzer.");
-    }
-  };
-
-  // ✅ Upload JSON results
-  const handleJSONUpload = (data: ForensicCase) => {
+  const handleLoaded = (data: CaseFile) => {
+    // addCase selects the new case as well — see the note in AppContext.
     addCase(data);
-    navigate('/results'); // navigate after upload
+    navigate('/results');
   };
 
-  const features = [
-    {
-      icon: Search,
-      title: 'Deep System Scan',
-      description: 'Comprehensive analysis of your disk including deleted files and hidden data',
-    },
-    {
-      icon: BarChart3,
-      title: 'Visual Analytics',
-      description: 'Interactive charts and timelines to understand file activity patterns',
-    },
-    {
-      icon: AlertTriangle,
-      title: 'Threat Detection',
-      description: 'Advanced algorithms to identify suspicious files and potential security risks',
-    },
-    {
-      icon: Shield,
-      title: 'Secure Processing',
-      description: 'All analysis is performed locally with enterprise-grade security',
-    },
-  ];
+  const handleSelect = (caseId: string) => {
+    selectCase(caseId);
+    navigate('/results');
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-forest-50 dark:from-slate-950 dark:to-forest-950">
-      <Navbar />
-
-      <main className="container mx-auto px-6 py-12">
-        {/* Hero Section */}
-        <div className="text-center mb-16">
-          <div className="flex justify-center mb-6">
-            <div className="p-4 bg-forest-100 dark:bg-forest-950/40 rounded-full">
-              <Shield className="w-16 h-16 text-forest-600 dark:text-forest-400" />
-            </div>
-          </div>
-
-          <h1 className="text-5xl font-bold text-gray-900 dark:text-white mb-6">
-            ForensicaLite
-          </h1>
-
-          <p className="text-xl text-gray-600 dark:text-slate-300 mb-8 max-w-3xl mx-auto">
-            Professional digital forensics analysis tool for comprehensive disk examination,
-            file recovery, and security assessment. Uncover hidden insights with enterprise-grade forensic capabilities.
+    <AppShell
+      topbar={
+        <div className="flex items-baseline gap-3">
+          <span className="text-xs text-ink-100 light:text-ink-900">Workspace</span>
+          <Mono className="text-2xs text-ink-500">
+            {cases.length} case{cases.length === 1 ? '' : 's'} open
+          </Mono>
+        </div>
+      }
+      railFooter={
+        <div className="space-y-2">
+          <p className="field-label">Analyzer</p>
+          <a
+            href={ANALYZER_RELEASES_URL}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="block font-mono text-2xs text-accent-400 transition-colors hover:text-accent-300"
+          >
+            checkup.exe &rarr;
+          </a>
+          <p className="text-micro leading-relaxed text-ink-500">
+            Run as Administrator on the target machine. Published with a SHA-256.
           </p>
         </div>
+      }
+    >
+      <div className="mx-auto max-w-6xl space-y-4">
+        {storageError && (
+          <Notice tone="warn" onDismiss={dismissStorageError}>
+            {storageError}
+          </Notice>
+        )}
 
-        {/* Features Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
-          {features.map((feature) => {
-            const Icon = feature.icon;
-            return (
-              <div
-                key={feature.title}
-                className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 hover:shadow-md transition-shadow flex flex-col h-full"
-              >
-                <div className="p-3 bg-forest-100 dark:bg-forest-950/40 rounded-lg w-fit mb-4">
-                  <Icon className="w-6 h-6 text-forest-600 dark:text-forest-400" />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
-                  {feature.title}
-                </h3>
-                <p className="text-gray-600 dark:text-slate-300 text-sm flex-grow">
-                  {feature.description}
-                </p>
-              </div>
-            );
-          })}
-        </div>
+        <CaseList cases={cases} onSelectCase={handleSelect} onRemoveCase={removeCase} />
 
-        {/* Main Actions */}
-        <div className="max-w-4xl mx-auto">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-gray-200 dark:border-slate-700 p-8">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white text-center mb-8">
-              Start Your Forensic Analysis
-            </h2>
-
-            <div className="grid md:grid-cols-2 gap-8">
-              {/* EXE Download */}
-              <div className="text-center p-6">
-                <div className="p-4 bg-forest-100 dark:bg-forest-950/40 rounded-full w-fit mx-auto mb-4">
-                  <Download className="w-8 h-8 text-forest-600 dark:text-forest-400" />
-                </div>
-
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
-                  Step 1: Download Analyzer
-                </h3>
-
-                <p className="text-gray-600 dark:text-slate-300 mb-6">
-                  Download our forensic analyzer tool and run it on your system to generate analysis results.
-                </p>
-
-                <button
-                  onClick={handleDownloadEXE}
-                  className="bg-forest-600 hover:bg-forest-700 dark:bg-forest-700 dark:hover:bg-forest-800 text-white font-semibold px-6 py-3 rounded-lg transition-colors inline-flex items-center space-x-2"
-                >
-                  <Download className="w-5 h-5" />
-                  <span>Download EXE</span>
-                </button>
-
-                <div className="mt-4 text-sm text-gray-500 dark:text-slate-400">
-                  <p>1. Download the analyzer</p>
-                  <p>2. Run as administrator</p>
-                  <p>3. Locate the generated JSON file</p>
-                </div>
-              </div>
-
-              {/* Manual Upload */}
-              <div className="text-center p-6 border-t md:border-t-0 md:border-l border-gray-200 dark:border-slate-600">
-                <div className="p-4 bg-forest-100 dark:bg-forest-950/40 rounded-full w-fit mx-auto mb-4">
-                  <Upload className="w-8 h-8 text-forest-600 dark:text-forest-400" />
-                </div>
-
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
-                  Step 2: Upload Results
-                </h3>
-
-                <p className="text-gray-600 dark:text-slate-300 mb-6">
-                  Once you have the JSON output from the analyzer, upload it here to view the forensic report.
-                </p>
-
-                {!showUpload ? (
-                  <button
-                    onClick={() => setShowUpload(true)}
-                    className="bg-forest-600 hover:bg-forest-700 dark:bg-forest-700 dark:hover:bg-forest-800 text-white font-semibold px-6 py-3 rounded-lg transition-colors inline-flex items-center space-x-2"
-                  >
-                    <Upload className="w-5 h-5" />
-                    <span>Upload JSON</span>
-                  </button>
-                ) : (
-                  <div className="mt-4">
-                    <FileUpload onUpload={handleJSONUpload} />
-                  </div>
-                )}
-              </div>
+        <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
+          <Panel>
+            <PanelHeader title="Open a case" />
+            <div className="px-4 py-4">
+              <FileUpload onUpload={handleLoaded} compact={cases.length > 0} />
             </div>
-          </div>
-        </div>
+          </Panel>
 
-        {/* Info Section */}
-        <div className="mt-16 text-center">
-          <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-700 rounded-lg p-6 max-w-2xl mx-auto">
-            <AlertTriangle className="w-8 h-8 text-amber-600 dark:text-amber-400 mx-auto mb-3" />
-            <h3 className="font-semibold text-amber-900 dark:text-amber-100 mb-2">
-              Important Notice
-            </h3>
-            <p className="text-amber-800 dark:text-amber-200 text-sm">
-              ForensicaLite is designed for legitimate forensic analysis and security assessment purposes only.
-              Ensure you have proper authorization before analyzing any system or data.
-            </p>
-          </div>
+          <Panel>
+            <PanelHeader title="Workflow" meta="2 steps" />
+            <ol className="divide-y divide-ink-850 light:divide-ink-50">
+              <li className="px-4 py-3">
+                <div className="flex items-baseline gap-2.5">
+                  <Mono className="text-2xs text-accent-400">01</Mono>
+                  <span className="text-xs text-ink-100 light:text-ink-900">Collect</span>
+                </div>
+                <p className="mt-1.5 pl-8 text-2xs leading-relaxed text-ink-400 light:text-ink-500">
+                  The analyzer opens the volume for raw sector access, parses{' '}
+                  <Mono className="text-ink-200 light:text-ink-800">$MFT</Mono> directly, and writes
+                  one JSON case file. It never touches the network.
+                </p>
+              </li>
+              <li className="px-4 py-3">
+                <div className="flex items-baseline gap-2.5">
+                  <Mono className="text-2xs text-accent-400">02</Mono>
+                  <span className="text-xs text-ink-100 light:text-ink-900">Examine</span>
+                </div>
+                <p className="mt-1.5 pl-8 text-2xs leading-relaxed text-ink-400 light:text-ink-500">
+                  Open the case file here. Parsing and rendering happen in the browser — this is a
+                  static site with no backend, so evidence cannot leave the machine.
+                </p>
+              </li>
+            </ol>
+          </Panel>
         </div>
-      </main>
-
-      <Footer />
-    </div>
+      </div>
+    </AppShell>
   );
 };
 
