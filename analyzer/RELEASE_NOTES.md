@@ -8,8 +8,8 @@ sector-level access and writes a schema-v1 JSON case file for the
 
 ```
 SHA-256  0d2aaff82d98253168fc245880d28e396b0f3fe8ff2e5443156e139a87134757
-Size     7.1 MB (7,454,932 bytes)
-Built    from commit 6330a07, Python 3.12.10, PyInstaller 6.21.0
+Size     7,455,079 bytes
+Built    from commit b5f343e, Python 3.12.10, PyInstaller 6.21.0
 ```
 
 ```powershell
