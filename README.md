@@ -17,9 +17,9 @@ between analyzer and UI has been redefined.
 | Case file schema (v1) | Done — [src/types/case.ts](src/types/case.ts) |
 | Web app / report UI | Done, verified in browser |
 | Sample case fixture | Done — `npm run sample` |
-| Analyzer (`checkup.py`) | Done — 50 tests passing, full pipeline exercised |
-| Verified against a real volume | **Not yet.** Needs an elevated prompt and an NTFS test volume |
-| `checkup.exe` build | Not yet produced — `analyzer/build.ps1` is ready |
+| Analyzer (`checkup.py`) | Done — 66 tests passing |
+| Verified against a real volume | Done — 57 GB NTFS, geometry cross-checked against `fsutil` |
+| `checkup.exe` build | Built by [analyzer/build.ps1](analyzer/build.ps1); blocked by Smart App Control, see below |
 
 Load the bundled sample case from the landing page to explore the report without running a scan.
 
@@ -29,12 +29,19 @@ boot sector, real `$MFT` with correct fixups, real `$Bitmap`. That covers geomet
 `$MFT` extent map, enumeration, path reconstruction, recovery assessment, hashing, and every
 detector, with no volume or privileges needed.
 
-The round trip is confirmed working: `checkup.py` → JSON → the web app's loader → rendered report,
-with a deleted file's content recovered from its MFT record and displayed.
+It was then run against a **real 57 GB NTFS volume** with artifacts planted by
+[stage_evidence.ps1](scripts/stage_evidence.ps1). Cluster geometry, `$MFT` offset and record size
+matched `fsutil fsinfo ntfsinfo` exactly; 40 records parsed with zero errors; both planted deletions
+were found, one recovered byte-for-byte from its MFT record. A single data run decoded to
+1280 clusters × 4096 = 5,242,880 bytes — exactly the file size, which is a direct check on the
+signed-delta run decoding.
 
-What that does *not* prove is behaviour on a real disk — a genuine volume brings fragmented `$MFT`
-extents, `$ATTRIBUTE_LIST` records, hard links, reparse points and sheer scale. Expect to debug on
-first contact.
+Three bugs surfaced only on real hardware, none in the parsing layer: the staging script was
+reclaiming its own deleted MFT records, it was not re-runnable because of the attributes it set, and
+the detectors were burying real findings under NTFS metafiles under `$Extend`.
+
+Still unproven at scale: a volume with a fragmented `$MFT`, `$ATTRIBUTE_LIST` records, hard links,
+reparse points and hundreds of thousands of entries.
 
 ## Architecture
 
