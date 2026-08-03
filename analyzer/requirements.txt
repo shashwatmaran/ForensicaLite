@@ -1,0 +1,6 @@
+# The analyzer itself has no runtime dependencies — every structure is parsed
+# from the volume with the standard library alone. This file covers the build
+# and test toolchain only.
+
+pyinstaller>=6.0
+pytest>=8.0
