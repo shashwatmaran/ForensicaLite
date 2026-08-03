@@ -24,13 +24,21 @@ from forensica.gui import CheckupApp  # noqa: E402
 from forensica.progress import Progress, Reporter, ScanCancelled  # noqa: E402
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def root():
+    """
+    One Tk root for the whole module.
+
+    Creating and destroying a root per test makes Tcl initialisation fail
+    intermittently ("Can't find a usable init.tcl"), which the fixture then
+    reports as "no display" and skips — silently dropping coverage. Reusing a
+    single root avoids the churn entirely.
+    """
     try:
         window = tk.Tk()
     except tk.TclError as error:
         pytest.skip(f"no display available: {error}")
-    window.withdraw()  # never actually show it during tests
+    window.withdraw()
     yield window
     try:
         window.destroy()
@@ -40,6 +48,11 @@ def root():
 
 @pytest.fixture
 def app(root):
+    """A freshly built interface on the shared root."""
+    for child in root.winfo_children():
+        child.destroy()
+    root.withdraw()  # layout tests deiconify; don't leak that to the next test
+
     instance = CheckupApp(root)
     root.update_idletasks()
     return instance
@@ -58,6 +71,39 @@ def test_window_builds(app):
 
 def test_output_defaults_to_a_json_path(app):
     assert app.output_var.get().endswith(".json")
+
+
+def test_action_buttons_are_actually_displayed(app, root):
+    """
+    Regression: the log panel expands to fill, and anything packed after it got
+    squeezed out entirely when the content was taller than the window — which
+    the elevation notice made routine. The buttons existed with correct text
+    and were simply never mapped, so they read as blank.
+    """
+    # The window has to be on screen: a withdrawn toplevel never maps its
+    # children, so this is the only state in which the bug reproduces.
+    root.deiconify()
+    root.geometry("780x680")
+    root.update()
+
+    for name, widget in (
+        ("scan", app.scan_button),
+        ("cancel", app.cancel_button),
+        ("open", app.open_button),
+    ):
+        assert widget.winfo_ismapped(), f"{name} button is not displayed"
+        assert widget.winfo_width() >= widget.winfo_reqwidth(), f"{name} button is clipped"
+        assert widget.winfo_height() >= widget.winfo_reqheight(), f"{name} button is clipped"
+
+
+def test_action_buttons_survive_a_short_window(app, root):
+    """The bottom row must hold its space even when the window is cramped."""
+    root.deiconify()
+    root.geometry("780x420")
+    root.update()
+
+    assert app.scan_button.winfo_ismapped()
+    assert app.scan_button.winfo_width() >= app.scan_button.winfo_reqwidth()
 
 
 def test_progress_updates_bar_and_labels(app, root):
