@@ -1,0 +1,1580 @@
+{
+  "schemaVersion": 1,
+  "generator": {
+    "tool": "checkup",
+    "version": "2.0.0-dev",
+    "builtAt": null
+  },
+  "volume": {
+    "label": "CASE-TEST",
+    "driveLetter": "E:",
+    "serialNumber": "7a3c91e40b28f5d6",
+    "fileSystem": "NTFS",
+    "bytesPerSector": 512,
+    "sectorsPerCluster": 8,
+    "bytesPerCluster": 4096,
+    "totalClusters": 524288,
+    "totalBytes": 2147483648,
+    "mftStartCluster": 65536,
+    "mftRecordSize": 1024,
+    "mftRecordsTotal": 2048,
+    "createdAt": "2026-07-18T09:14:02.187Z"
+  },
+  "scan": {
+    "caseId": "CASE-2026-0725-E",
+    "startedAt": "2026-07-25T10:03:11.000Z",
+    "completedAt": "2026-07-25T10:03:48.512Z",
+    "durationSeconds": 37.512,
+    "hostname": "DESKTOP-FORENSICA",
+    "operator": "DESKTOP-FORENSICA\\anide",
+    "mftRecordsParsed": 1204,
+    "mftRecordsInUse": 1163,
+    "mftRecordsDeleted": 41,
+    "filesRecovered": 2,
+    "errors": [
+      {
+        "stage": "attribute",
+        "recordNumber": 96,
+        "message": "attribute 0x80 header truncated at record boundary; stream skipped"
+      },
+      {
+        "stage": "hash",
+        "recordNumber": 88,
+        "message": "stream not hashed: 1 of 3 data runs reallocated, content unreliable"
+      }
+    ]
+  },
+  "statistics": {
+    "fileCounts": {
+      "total": 1204,
+      "active": 1163,
+      "deleted": 41,
+      "directories": 87,
+      "withAlternateStreams": 1,
+      "timestomped": 2,
+      "orphaned": 1
+    },
+    "fileTypes": {
+      "documents": 214,
+      "images": 96,
+      "videos": 12,
+      "executables": 31,
+      "scripts": 18,
+      "archives": 9,
+      "logs": 44,
+      "other": 693,
+      "directories": 87
+    },
+    "sizeBuckets": [
+      {
+        "label": "Resident (<1 KB)",
+        "minBytes": 0,
+        "maxBytes": 1024,
+        "count": 402
+      },
+      {
+        "label": "1 KB - 1 MB",
+        "minBytes": 1024,
+        "maxBytes": 1048576,
+        "count": 611
+      },
+      {
+        "label": "1 MB - 100 MB",
+        "minBytes": 1048576,
+        "maxBytes": 104857600,
+        "count": 178
+      },
+      {
+        "label": "> 100 MB",
+        "minBytes": 104857600,
+        "maxBytes": null,
+        "count": 13
+      }
+    ],
+    "histogram": [
+      {
+        "date": "1998-11-04",
+        "created": 1,
+        "modified": 1,
+        "accessed": 1,
+        "deleted": 0
+      },
+      {
+        "date": "2019-03-12",
+        "created": 1,
+        "modified": 1,
+        "accessed": 1,
+        "deleted": 0
+      },
+      {
+        "date": "2026-07-19",
+        "created": 6,
+        "modified": 6,
+        "accessed": 3,
+        "deleted": 0
+      },
+      {
+        "date": "2026-07-20",
+        "created": 7,
+        "modified": 18,
+        "accessed": 8,
+        "deleted": 3
+      },
+      {
+        "date": "2026-07-21",
+        "created": 0,
+        "modified": 2,
+        "accessed": 1,
+        "deleted": 0
+      }
+    ],
+    "findingsBySeverity": {
+      "critical": 1,
+      "high": 3,
+      "medium": 4,
+      "low": 0,
+      "info": 0
+    },
+    "findingsByType": {
+      "timestomp": 2,
+      "alternate-data-stream": 1,
+      "deleted-recoverable": 2,
+      "orphaned-file": 1,
+      "hidden-system-file": 1,
+      "impossible-timestamp": 1
+    }
+  },
+  "findings": [
+    {
+      "id": "f-001",
+      "type": "timestomp",
+      "severity": "critical",
+      "title": "$SI creation time predates $FN creation time",
+      "description": "The $STANDARD_INFORMATION creation timestamp is over seven years earlier than the $FILE_NAME creation timestamp. $SI is writable from user mode via SetFileTime; $FN is only written by the kernel on create, rename or move. This ordering cannot occur through normal filesystem activity.",
+      "recordNumber": 57,
+      "filePath": "E:\\Tools\\svchost.exe",
+      "detectedBy": "si-fn-created-mismatch",
+      "confidence": "high",
+      "evidence": [
+        {
+          "label": "$SI Created",
+          "value": "2019-03-12T08:00:00.000Z",
+          "note": "user-settable"
+        },
+        {
+          "label": "$FN Created",
+          "value": "2026-07-20T14:32:11.442Z",
+          "note": "kernel-maintained"
+        },
+        {
+          "label": "Delta",
+          "value": "2687 days earlier",
+          "note": null
+        },
+        {
+          "label": "$SI MFT-Modified",
+          "value": "2026-07-20T14:32:11.442Z",
+          "note": "matches $FN — the record was touched at the real creation time"
+        }
+      ]
+    },
+    {
+      "id": "f-002",
+      "type": "timestomp",
+      "severity": "high",
+      "title": "Sub-second precision zeroed on all $SI timestamps",
+      "description": "All four $SI timestamps land on an exact whole second. NTFS records time in 100-nanosecond intervals, so genuine filesystem activity almost never produces a zero remainder. Many timestomping utilities accept only second-granularity input and leave this artifact behind.",
+      "recordNumber": 57,
+      "filePath": "E:\\Tools\\svchost.exe",
+      "detectedBy": "si-subsecond-zeroed",
+      "confidence": "medium",
+      "evidence": [
+        {
+          "label": "$SI Created FILETIME",
+          "value": "131968512000000000",
+          "note": "remainder 0"
+        },
+        {
+          "label": "$FN Created FILETIME",
+          "value": "134290315314420000",
+          "note": "remainder 4420000 — normal"
+        },
+        {
+          "label": "Fields affected",
+          "value": "created, modified, accessed",
+          "note": null
+        }
+      ]
+    },
+    {
+      "id": "f-003",
+      "type": "alternate-data-stream",
+      "severity": "high",
+      "title": "Named data stream hidden on a text file",
+      "description": "Record 63 carries a second $DATA attribute named \"payload\", eleven times larger than the visible file. Alternate Data Streams do not appear in Explorer, in dir output, or in the reported file size.",
+      "recordNumber": 63,
+      "filePath": "E:\\Docs\\notes.txt",
+      "detectedBy": "named-data-stream-present",
+      "confidence": "high",
+      "evidence": [
+        {
+          "label": "Visible stream",
+          "value": "184 bytes (resident)",
+          "note": null
+        },
+        {
+          "label": "Hidden stream",
+          "value": "notes.txt:payload — 2048 bytes",
+          "note": "non-resident"
+        },
+        {
+          "label": "Stream modified",
+          "value": "2026-07-20T14:35:02.881Z",
+          "note": "three minutes after svchost.exe was planted"
+        }
+      ]
+    },
+    {
+      "id": "f-004",
+      "type": "deleted-recoverable",
+      "severity": "high",
+      "title": "Deleted credentials file fully recoverable from MFT record",
+      "description": "The file was small enough to be stored resident — its bytes lived inside MFT record 71 rather than in disk clusters. Deletion only cleared the record's in-use flag, so the content is recoverable byte-for-byte.",
+      "recordNumber": 71,
+      "filePath": "E:\\Docs\\handover-credentials.txt",
+      "detectedBy": "deleted-resident-content",
+      "confidence": "high",
+      "evidence": [
+        {
+          "label": "Residency",
+          "value": "resident (412 bytes)",
+          "note": "below the ~700 byte threshold"
+        },
+        {
+          "label": "Record in-use flag",
+          "value": "clear",
+          "note": "deleted"
+        },
+        {
+          "label": "Recovered",
+          "value": "412 of 412 bytes",
+          "note": "complete"
+        },
+        {
+          "label": "Deleted at",
+          "value": "2026-07-20T18:02:07.115Z",
+          "note": "$SI MFT-modified time, 6 minutes after last write"
+        }
+      ]
+    },
+    {
+      "id": "f-005",
+      "type": "deleted-recoverable",
+      "severity": "medium",
+      "title": "Deleted screen capture partially recoverable",
+      "description": "Data runs are intact in the MFT record, but one of three runs overlaps clusters since reallocated to an active file. A carve will produce a partial or corrupt file.",
+      "recordNumber": 88,
+      "filePath": "E:\\Media\\screen-capture.mp4",
+      "detectedBy": "deleted-nonresident-runs",
+      "confidence": "medium",
+      "evidence": [
+        {
+          "label": "Size",
+          "value": "12,874,219 bytes",
+          "note": null
+        },
+        {
+          "label": "Data runs",
+          "value": "3 runs, 3144 clusters",
+          "note": null
+        },
+        {
+          "label": "Reallocated",
+          "value": "1 of 3 runs",
+          "note": "clusters 201472-202055"
+        }
+      ]
+    },
+    {
+      "id": "f-006",
+      "type": "orphaned-file",
+      "severity": "medium",
+      "title": "Deleted PowerShell script with unresolvable parent",
+      "description": "Record 94 names parent record 91, but that record has been reused by a different file with a mismatched sequence number, so no path can be reconstructed. The script existed; where it lived is no longer provable.",
+      "recordNumber": 94,
+      "filePath": null,
+      "detectedBy": "parent-sequence-mismatch",
+      "confidence": "high",
+      "evidence": [
+        {
+          "label": "File name",
+          "value": "stage2.ps1",
+          "note": "from $FILE_NAME"
+        },
+        {
+          "label": "Parent record",
+          "value": "91",
+          "note": "sequence number does not match"
+        },
+        {
+          "label": "Path",
+          "value": "unresolvable",
+          "note": null
+        },
+        {
+          "label": "Created",
+          "value": "2026-07-20T14:28:50.132Z",
+          "note": "3 minutes before svchost.exe"
+        }
+      ]
+    },
+    {
+      "id": "f-007",
+      "type": "hidden-system-file",
+      "severity": "medium",
+      "title": "HIDDEN+SYSTEM attributes on a non-system-path executable",
+      "description": "The record carries both HIDDEN and SYSTEM attributes while living outside any Windows system directory. This combination hides a file from default Explorer views and from ordinary dir listings.",
+      "recordNumber": 57,
+      "filePath": "E:\\Tools\\svchost.exe",
+      "detectedBy": "hidden-system-outside-system-path",
+      "confidence": "medium",
+      "evidence": [
+        {
+          "label": "Attributes",
+          "value": "HIDDEN, SYSTEM, ARCHIVE",
+          "note": null
+        },
+        {
+          "label": "Path",
+          "value": "E:\\Tools\\",
+          "note": "not a system directory"
+        },
+        {
+          "label": "File name",
+          "value": "svchost.exe",
+          "note": "matches a legitimate Windows binary name"
+        }
+      ]
+    },
+    {
+      "id": "f-008",
+      "type": "impossible-timestamp",
+      "severity": "medium",
+      "title": "File claims creation 27 years before the volume was formatted",
+      "description": "The $SI creation timestamp precedes the volume creation time recorded in $VOLUME_INFORMATION. A file cannot predate the filesystem containing it.",
+      "recordNumber": 102,
+      "filePath": "E:\\Tools\\install.log",
+      "detectedBy": "si-before-volume-creation",
+      "confidence": "high",
+      "evidence": [
+        {
+          "label": "$SI Created",
+          "value": "1998-11-04T02:15:00.000Z",
+          "note": null
+        },
+        {
+          "label": "Volume created",
+          "value": "2026-07-18T09:14:02.187Z",
+          "note": "from $VOLUME_INFORMATION"
+        },
+        {
+          "label": "$FN Created",
+          "value": "2026-07-20T14:33:48.900Z",
+          "note": "consistent with the volume"
+        }
+      ]
+    }
+  ],
+  "files": {
+    "truncated": true,
+    "includedCount": 7,
+    "totalCount": 1204,
+    "inclusionPolicy": "Records referenced by a finding, plus all deleted records with recoverable content. Run with --full to emit every parsed record.",
+    "entries": [
+      {
+        "recordNumber": 41,
+        "sequenceNumber": 1,
+        "parentRecordNumber": 38,
+        "fileName": "quarterly-report.docx",
+        "filePath": "E:\\Docs\\quarterly-report.docx",
+        "isDirectory": false,
+        "size": 46129,
+        "allocatedSize": 49152,
+        "isAllocated": true,
+        "status": "active",
+        "attributes": [
+          "ARCHIVE"
+        ],
+        "standardInfo": {
+          "created": {
+            "iso": "2026-07-19T11:02:44.318Z",
+            "filetime": "134289325643180000"
+          },
+          "modified": {
+            "iso": "2026-07-21T16:48:09.771Z",
+            "filetime": "134291260897710000"
+          },
+          "mftModified": {
+            "iso": "2026-07-21T16:48:09.771Z",
+            "filetime": "134291260897710000"
+          },
+          "accessed": {
+            "iso": "2026-07-21T16:48:09.771Z",
+            "filetime": "134291260897710000"
+          }
+        },
+        "fileNameInfo": {
+          "created": {
+            "iso": "2026-07-19T11:02:44.318Z",
+            "filetime": "134289325643180000"
+          },
+          "modified": {
+            "iso": "2026-07-19T11:02:44.318Z",
+            "filetime": "134289325643180000"
+          },
+          "mftModified": {
+            "iso": "2026-07-19T11:02:44.318Z",
+            "filetime": "134289325643180000"
+          },
+          "accessed": {
+            "iso": "2026-07-19T11:02:44.318Z",
+            "filetime": "134289325643180000"
+          }
+        },
+        "streams": [
+          {
+            "name": "",
+            "size": 46129,
+            "residency": "non-resident",
+            "hash": {
+              "algorithm": "sha256",
+              "value": "9f2b7c41e8a35d06fbc19d4e7a2851b3c6d90f4e1a7b385c2e94f6017da3c8b5",
+              "scope": "stream-content"
+            }
+          }
+        ],
+        "recovery": null,
+        "findingIds": []
+      },
+      {
+        "recordNumber": 57,
+        "sequenceNumber": 1,
+        "parentRecordNumber": 52,
+        "fileName": "svchost.exe",
+        "filePath": "E:\\Tools\\svchost.exe",
+        "isDirectory": false,
+        "size": 118784,
+        "allocatedSize": 122880,
+        "isAllocated": true,
+        "status": "active",
+        "attributes": [
+          "HIDDEN",
+          "SYSTEM",
+          "ARCHIVE"
+        ],
+        "standardInfo": {
+          "created": {
+            "iso": "2019-03-12T08:00:00.000Z",
+            "filetime": "131968512000000000"
+          },
+          "modified": {
+            "iso": "2019-03-12T08:00:00.000Z",
+            "filetime": "131968512000000000"
+          },
+          "mftModified": {
+            "iso": "2026-07-20T14:32:11.442Z",
+            "filetime": "134290315314420000"
+          },
+          "accessed": {
+            "iso": "2019-03-12T08:00:00.000Z",
+            "filetime": "131968512000000000"
+          }
+        },
+        "fileNameInfo": {
+          "created": {
+            "iso": "2026-07-20T14:32:11.442Z",
+            "filetime": "134290315314420000"
+          },
+          "modified": {
+            "iso": "2026-07-20T14:32:11.442Z",
+            "filetime": "134290315314420000"
+          },
+          "mftModified": {
+            "iso": "2026-07-20T14:32:11.442Z",
+            "filetime": "134290315314420000"
+          },
+          "accessed": {
+            "iso": "2026-07-20T14:32:11.442Z",
+            "filetime": "134290315314420000"
+          }
+        },
+        "streams": [
+          {
+            "name": "",
+            "size": 118784,
+            "residency": "non-resident",
+            "hash": {
+              "algorithm": "sha256",
+              "value": "4c1e9a7f3b28d5106e4fa9c37b0d82e51fa6470c9e3b8d15726af04c8b39e1d2",
+              "scope": "stream-content"
+            }
+          }
+        ],
+        "recovery": null,
+        "findingIds": [
+          "f-001",
+          "f-002",
+          "f-007"
+        ]
+      },
+      {
+        "recordNumber": 63,
+        "sequenceNumber": 1,
+        "parentRecordNumber": 38,
+        "fileName": "notes.txt",
+        "filePath": "E:\\Docs\\notes.txt",
+        "isDirectory": false,
+        "size": 184,
+        "allocatedSize": 0,
+        "isAllocated": true,
+        "status": "active",
+        "attributes": [
+          "ARCHIVE"
+        ],
+        "standardInfo": {
+          "created": {
+            "iso": "2026-07-19T13:20:55.004Z",
+            "filetime": "134289408550040000"
+          },
+          "modified": {
+            "iso": "2026-07-20T14:35:02.881Z",
+            "filetime": "134290317028810000"
+          },
+          "mftModified": {
+            "iso": "2026-07-20T14:35:02.881Z",
+            "filetime": "134290317028810000"
+          },
+          "accessed": {
+            "iso": "2026-07-20T14:35:02.881Z",
+            "filetime": "134290317028810000"
+          }
+        },
+        "fileNameInfo": {
+          "created": {
+            "iso": "2026-07-19T13:20:55.004Z",
+            "filetime": "134289408550040000"
+          },
+          "modified": {
+            "iso": "2026-07-19T13:20:55.004Z",
+            "filetime": "134289408550040000"
+          },
+          "mftModified": {
+            "iso": "2026-07-19T13:20:55.004Z",
+            "filetime": "134289408550040000"
+          },
+          "accessed": {
+            "iso": "2026-07-19T13:20:55.004Z",
+            "filetime": "134289408550040000"
+          }
+        },
+        "streams": [
+          {
+            "name": "",
+            "size": 184,
+            "residency": "resident",
+            "hash": {
+              "algorithm": "sha256",
+              "value": "b1d84f0a29c7e5361d8b4a07f92ce5138604ab7d2f91e0c3856b4d7a90f2e1c6",
+              "scope": "stream-content"
+            }
+          },
+          {
+            "name": "payload",
+            "size": 2048,
+            "residency": "non-resident",
+            "hash": {
+              "algorithm": "sha256",
+              "value": "e70c9d21b8a43f5c8e10d69b247a0fc85e3b9128d47a60ce9b35f8a1d02e74c1",
+              "scope": "stream-content"
+            }
+          }
+        ],
+        "recovery": null,
+        "findingIds": [
+          "f-003"
+        ]
+      },
+      {
+        "recordNumber": 71,
+        "sequenceNumber": 2,
+        "parentRecordNumber": 38,
+        "fileName": "handover-credentials.txt",
+        "filePath": "E:\\Docs\\handover-credentials.txt",
+        "isDirectory": false,
+        "size": 412,
+        "allocatedSize": 0,
+        "isAllocated": false,
+        "status": "deleted",
+        "attributes": [
+          "ARCHIVE"
+        ],
+        "standardInfo": {
+          "created": {
+            "iso": "2026-07-19T09:41:12.663Z",
+            "filetime": "134289276726630000"
+          },
+          "modified": {
+            "iso": "2026-07-20T17:55:41.209Z",
+            "filetime": "134290437412090000"
+          },
+          "mftModified": {
+            "iso": "2026-07-20T18:02:07.115Z",
+            "filetime": "134290441271150000"
+          },
+          "accessed": {
+            "iso": "2026-07-20T17:55:41.209Z",
+            "filetime": "134290437412090000"
+          }
+        },
+        "fileNameInfo": {
+          "created": {
+            "iso": "2026-07-19T09:41:12.663Z",
+            "filetime": "134289276726630000"
+          },
+          "modified": {
+            "iso": "2026-07-19T09:41:12.663Z",
+            "filetime": "134289276726630000"
+          },
+          "mftModified": {
+            "iso": "2026-07-19T09:41:12.663Z",
+            "filetime": "134289276726630000"
+          },
+          "accessed": {
+            "iso": "2026-07-19T09:41:12.663Z",
+            "filetime": "134289276726630000"
+          }
+        },
+        "streams": [
+          {
+            "name": "",
+            "size": 412,
+            "residency": "resident",
+            "hash": null
+          }
+        ],
+        "recovery": {
+          "confidence": "full",
+          "reason": "Stream was resident: all 412 bytes live inside MFT record 71 and were never written to disk clusters, so deletion left the content intact.",
+          "residentContentBase64": "IyBIYW5kb3ZlciBub3RlcyAtIGRlbGV0ZSBiZWZvcmUgbGVhdmluZwpqdW1wIGhvc3Q6IDEwLjE0LjIyLjgKc2VydmljZSBhY2NvdW50OiBzdmNfYmFja3VwCnNoYXJlZCB2YXVsdCBwYXRoOiBcXGZpbGVzZXJ2ZXJcb3BzXHZhdWx0CnJvdGF0aW9uIGR1ZTogMjAyNi0wOC0wMQ==",
+          "dataRuns": [],
+          "clustersReallocated": null
+        },
+        "findingIds": [
+          "f-004"
+        ]
+      },
+      {
+        "recordNumber": 88,
+        "sequenceNumber": 1,
+        "parentRecordNumber": 80,
+        "fileName": "screen-capture.mp4",
+        "filePath": "E:\\Media\\screen-capture.mp4",
+        "isDirectory": false,
+        "size": 12874219,
+        "allocatedSize": 12877824,
+        "isAllocated": false,
+        "status": "deleted",
+        "attributes": [
+          "ARCHIVE"
+        ],
+        "standardInfo": {
+          "created": {
+            "iso": "2026-07-20T15:10:03.520Z",
+            "filetime": "134290338035200000"
+          },
+          "modified": {
+            "iso": "2026-07-20T15:22:47.905Z",
+            "filetime": "134290345679050000"
+          },
+          "mftModified": {
+            "iso": "2026-07-20T18:03:19.740Z",
+            "filetime": "134290441997400000"
+          },
+          "accessed": {
+            "iso": "2026-07-20T15:22:47.905Z",
+            "filetime": "134290345679050000"
+          }
+        },
+        "fileNameInfo": {
+          "created": {
+            "iso": "2026-07-20T15:10:03.520Z",
+            "filetime": "134290338035200000"
+          },
+          "modified": {
+            "iso": "2026-07-20T15:10:03.520Z",
+            "filetime": "134290338035200000"
+          },
+          "mftModified": {
+            "iso": "2026-07-20T15:10:03.520Z",
+            "filetime": "134290338035200000"
+          },
+          "accessed": {
+            "iso": "2026-07-20T15:10:03.520Z",
+            "filetime": "134290338035200000"
+          }
+        },
+        "streams": [
+          {
+            "name": "",
+            "size": 12874219,
+            "residency": "non-resident",
+            "hash": null
+          }
+        ],
+        "recovery": {
+          "confidence": "partial",
+          "reason": "Data runs survive in the MFT record, but 1 of 3 runs now overlaps clusters allocated to an active file. Expect a truncated or corrupt result on carve.",
+          "residentContentBase64": null,
+          "dataRuns": [
+            {
+              "startCluster": 191244,
+              "clusterCount": 1536
+            },
+            {
+              "startCluster": 194800,
+              "clusterCount": 1024
+            },
+            {
+              "startCluster": 201472,
+              "clusterCount": 584
+            }
+          ],
+          "clustersReallocated": true
+        },
+        "findingIds": [
+          "f-005"
+        ]
+      },
+      {
+        "recordNumber": 94,
+        "sequenceNumber": 3,
+        "parentRecordNumber": 91,
+        "fileName": "stage2.ps1",
+        "filePath": null,
+        "isDirectory": false,
+        "size": 3902,
+        "allocatedSize": 4096,
+        "isAllocated": false,
+        "status": "deleted",
+        "attributes": [
+          "ARCHIVE"
+        ],
+        "standardInfo": {
+          "created": {
+            "iso": "2026-07-20T14:28:50.132Z",
+            "filetime": "134290313301320000"
+          },
+          "modified": {
+            "iso": "2026-07-20T14:29:16.408Z",
+            "filetime": "134290313564080000"
+          },
+          "mftModified": {
+            "iso": "2026-07-20T18:04:55.021Z",
+            "filetime": "134290442950210000"
+          },
+          "accessed": {
+            "iso": "2026-07-20T14:29:16.408Z",
+            "filetime": "134290313564080000"
+          }
+        },
+        "fileNameInfo": {
+          "created": {
+            "iso": "2026-07-20T14:28:50.132Z",
+            "filetime": "134290313301320000"
+          },
+          "modified": {
+            "iso": "2026-07-20T14:28:50.132Z",
+            "filetime": "134290313301320000"
+          },
+          "mftModified": {
+            "iso": "2026-07-20T14:28:50.132Z",
+            "filetime": "134290313301320000"
+          },
+          "accessed": {
+            "iso": "2026-07-20T14:28:50.132Z",
+            "filetime": "134290313301320000"
+          }
+        },
+        "streams": [
+          {
+            "name": "",
+            "size": 3902,
+            "residency": "non-resident",
+            "hash": null
+          }
+        ],
+        "recovery": {
+          "confidence": "metadata-only",
+          "reason": "Parent record 91 has been reused, so the path cannot be rebuilt, and the single data run falls inside a region reallocated after deletion.",
+          "residentContentBase64": null,
+          "dataRuns": [
+            {
+              "startCluster": 208128,
+              "clusterCount": 1
+            }
+          ],
+          "clustersReallocated": true
+        },
+        "findingIds": [
+          "f-006"
+        ]
+      },
+      {
+        "recordNumber": 102,
+        "sequenceNumber": 1,
+        "parentRecordNumber": 52,
+        "fileName": "install.log",
+        "filePath": "E:\\Tools\\install.log",
+        "isDirectory": false,
+        "size": 7715,
+        "allocatedSize": 8192,
+        "isAllocated": true,
+        "status": "active",
+        "attributes": [
+          "ARCHIVE"
+        ],
+        "standardInfo": {
+          "created": {
+            "iso": "1998-11-04T02:15:00.000Z",
+            "filetime": "125546193000000000"
+          },
+          "modified": {
+            "iso": "1998-11-04T02:15:00.000Z",
+            "filetime": "125546193000000000"
+          },
+          "mftModified": {
+            "iso": "2026-07-20T14:33:48.900Z",
+            "filetime": "134290316289000000"
+          },
+          "accessed": {
+            "iso": "1998-11-04T02:15:00.000Z",
+            "filetime": "125546193000000000"
+          }
+        },
+        "fileNameInfo": {
+          "created": {
+            "iso": "2026-07-20T14:33:48.900Z",
+            "filetime": "134290316289000000"
+          },
+          "modified": {
+            "iso": "2026-07-20T14:33:48.900Z",
+            "filetime": "134290316289000000"
+          },
+          "mftModified": {
+            "iso": "2026-07-20T14:33:48.900Z",
+            "filetime": "134290316289000000"
+          },
+          "accessed": {
+            "iso": "2026-07-20T14:33:48.900Z",
+            "filetime": "134290316289000000"
+          }
+        },
+        "streams": [
+          {
+            "name": "",
+            "size": 7715,
+            "residency": "non-resident",
+            "hash": {
+              "algorithm": "sha256",
+              "value": "2a8f5c9017be34d2618af09c5b7e2d4a3016fc8b95e2740da1cb6f38059e4b17",
+              "scope": "stream-content"
+            }
+          }
+        ],
+        "recovery": null,
+        "findingIds": [
+          "f-008"
+        ]
+      }
+    ]
+  },
+  "timeline": {
+    "truncated": true,
+    "includedCount": 61,
+    "totalCount": 4923,
+    "inclusionPolicy": "MACB entries for included records, plus USN journal rows for create, rename and delete.",
+    "entries": [
+      {
+        "timestamp": "1998-11-04T02:15:00.000Z",
+        "source": "mft-si",
+        "action": "created",
+        "recordNumber": 102,
+        "filePath": "E:\\Tools\\install.log",
+        "detail": "$SI created",
+        "findingIds": [
+          "f-008"
+        ]
+      },
+      {
+        "timestamp": "1998-11-04T02:15:00.000Z",
+        "source": "mft-si",
+        "action": "modified",
+        "recordNumber": 102,
+        "filePath": "E:\\Tools\\install.log",
+        "detail": "$SI modified",
+        "findingIds": [
+          "f-008"
+        ]
+      },
+      {
+        "timestamp": "1998-11-04T02:15:00.000Z",
+        "source": "mft-si",
+        "action": "accessed",
+        "recordNumber": 102,
+        "filePath": "E:\\Tools\\install.log",
+        "detail": "$SI accessed",
+        "findingIds": [
+          "f-008"
+        ]
+      },
+      {
+        "timestamp": "2019-03-12T08:00:00.000Z",
+        "source": "mft-si",
+        "action": "created",
+        "recordNumber": 57,
+        "filePath": "E:\\Tools\\svchost.exe",
+        "detail": "$SI created",
+        "findingIds": [
+          "f-001",
+          "f-002",
+          "f-007"
+        ]
+      },
+      {
+        "timestamp": "2019-03-12T08:00:00.000Z",
+        "source": "mft-si",
+        "action": "modified",
+        "recordNumber": 57,
+        "filePath": "E:\\Tools\\svchost.exe",
+        "detail": "$SI modified",
+        "findingIds": [
+          "f-001",
+          "f-002",
+          "f-007"
+        ]
+      },
+      {
+        "timestamp": "2019-03-12T08:00:00.000Z",
+        "source": "mft-si",
+        "action": "accessed",
+        "recordNumber": 57,
+        "filePath": "E:\\Tools\\svchost.exe",
+        "detail": "$SI accessed",
+        "findingIds": [
+          "f-001",
+          "f-002",
+          "f-007"
+        ]
+      },
+      {
+        "timestamp": "2026-07-19T09:41:12.663Z",
+        "source": "mft-si",
+        "action": "created",
+        "recordNumber": 71,
+        "filePath": "E:\\Docs\\handover-credentials.txt",
+        "detail": "$SI created",
+        "findingIds": [
+          "f-004"
+        ]
+      },
+      {
+        "timestamp": "2026-07-19T09:41:12.663Z",
+        "source": "mft-fn",
+        "action": "created",
+        "recordNumber": 71,
+        "filePath": "E:\\Docs\\handover-credentials.txt",
+        "detail": "$FN created",
+        "findingIds": [
+          "f-004"
+        ]
+      },
+      {
+        "timestamp": "2026-07-19T09:41:12.663Z",
+        "source": "mft-fn",
+        "action": "modified",
+        "recordNumber": 71,
+        "filePath": "E:\\Docs\\handover-credentials.txt",
+        "detail": "$FN modified",
+        "findingIds": [
+          "f-004"
+        ]
+      },
+      {
+        "timestamp": "2026-07-19T09:41:12.663Z",
+        "source": "mft-fn",
+        "action": "mft-modified",
+        "recordNumber": 71,
+        "filePath": "E:\\Docs\\handover-credentials.txt",
+        "detail": "$FN mft-modified",
+        "findingIds": [
+          "f-004"
+        ]
+      },
+      {
+        "timestamp": "2026-07-19T09:41:12.663Z",
+        "source": "mft-fn",
+        "action": "accessed",
+        "recordNumber": 71,
+        "filePath": "E:\\Docs\\handover-credentials.txt",
+        "detail": "$FN accessed",
+        "findingIds": [
+          "f-004"
+        ]
+      },
+      {
+        "timestamp": "2026-07-19T11:02:44.318Z",
+        "source": "mft-si",
+        "action": "created",
+        "recordNumber": 41,
+        "filePath": "E:\\Docs\\quarterly-report.docx",
+        "detail": "$SI created",
+        "findingIds": []
+      },
+      {
+        "timestamp": "2026-07-19T11:02:44.318Z",
+        "source": "mft-fn",
+        "action": "created",
+        "recordNumber": 41,
+        "filePath": "E:\\Docs\\quarterly-report.docx",
+        "detail": "$FN created",
+        "findingIds": []
+      },
+      {
+        "timestamp": "2026-07-19T11:02:44.318Z",
+        "source": "mft-fn",
+        "action": "modified",
+        "recordNumber": 41,
+        "filePath": "E:\\Docs\\quarterly-report.docx",
+        "detail": "$FN modified",
+        "findingIds": []
+      },
+      {
+        "timestamp": "2026-07-19T11:02:44.318Z",
+        "source": "mft-fn",
+        "action": "mft-modified",
+        "recordNumber": 41,
+        "filePath": "E:\\Docs\\quarterly-report.docx",
+        "detail": "$FN mft-modified",
+        "findingIds": []
+      },
+      {
+        "timestamp": "2026-07-19T11:02:44.318Z",
+        "source": "mft-fn",
+        "action": "accessed",
+        "recordNumber": 41,
+        "filePath": "E:\\Docs\\quarterly-report.docx",
+        "detail": "$FN accessed",
+        "findingIds": []
+      },
+      {
+        "timestamp": "2026-07-19T13:20:55.004Z",
+        "source": "mft-si",
+        "action": "created",
+        "recordNumber": 63,
+        "filePath": "E:\\Docs\\notes.txt",
+        "detail": "$SI created",
+        "findingIds": [
+          "f-003"
+        ]
+      },
+      {
+        "timestamp": "2026-07-19T13:20:55.004Z",
+        "source": "mft-fn",
+        "action": "created",
+        "recordNumber": 63,
+        "filePath": "E:\\Docs\\notes.txt",
+        "detail": "$FN created",
+        "findingIds": [
+          "f-003"
+        ]
+      },
+      {
+        "timestamp": "2026-07-19T13:20:55.004Z",
+        "source": "mft-fn",
+        "action": "modified",
+        "recordNumber": 63,
+        "filePath": "E:\\Docs\\notes.txt",
+        "detail": "$FN modified",
+        "findingIds": [
+          "f-003"
+        ]
+      },
+      {
+        "timestamp": "2026-07-19T13:20:55.004Z",
+        "source": "mft-fn",
+        "action": "mft-modified",
+        "recordNumber": 63,
+        "filePath": "E:\\Docs\\notes.txt",
+        "detail": "$FN mft-modified",
+        "findingIds": [
+          "f-003"
+        ]
+      },
+      {
+        "timestamp": "2026-07-19T13:20:55.004Z",
+        "source": "mft-fn",
+        "action": "accessed",
+        "recordNumber": 63,
+        "filePath": "E:\\Docs\\notes.txt",
+        "detail": "$FN accessed",
+        "findingIds": [
+          "f-003"
+        ]
+      },
+      {
+        "timestamp": "2026-07-20T14:28:50.132Z",
+        "source": "mft-si",
+        "action": "created",
+        "recordNumber": 94,
+        "filePath": null,
+        "detail": "$SI created",
+        "findingIds": [
+          "f-006"
+        ]
+      },
+      {
+        "timestamp": "2026-07-20T14:28:50.132Z",
+        "source": "mft-fn",
+        "action": "created",
+        "recordNumber": 94,
+        "filePath": null,
+        "detail": "$FN created",
+        "findingIds": [
+          "f-006"
+        ]
+      },
+      {
+        "timestamp": "2026-07-20T14:28:50.132Z",
+        "source": "mft-fn",
+        "action": "modified",
+        "recordNumber": 94,
+        "filePath": null,
+        "detail": "$FN modified",
+        "findingIds": [
+          "f-006"
+        ]
+      },
+      {
+        "timestamp": "2026-07-20T14:28:50.132Z",
+        "source": "mft-fn",
+        "action": "mft-modified",
+        "recordNumber": 94,
+        "filePath": null,
+        "detail": "$FN mft-modified",
+        "findingIds": [
+          "f-006"
+        ]
+      },
+      {
+        "timestamp": "2026-07-20T14:28:50.132Z",
+        "source": "mft-fn",
+        "action": "accessed",
+        "recordNumber": 94,
+        "filePath": null,
+        "detail": "$FN accessed",
+        "findingIds": [
+          "f-006"
+        ]
+      },
+      {
+        "timestamp": "2026-07-20T14:29:16.408Z",
+        "source": "mft-si",
+        "action": "modified",
+        "recordNumber": 94,
+        "filePath": null,
+        "detail": "$SI modified",
+        "findingIds": [
+          "f-006"
+        ]
+      },
+      {
+        "timestamp": "2026-07-20T14:29:16.408Z",
+        "source": "mft-si",
+        "action": "accessed",
+        "recordNumber": 94,
+        "filePath": null,
+        "detail": "$SI accessed",
+        "findingIds": [
+          "f-006"
+        ]
+      },
+      {
+        "timestamp": "2026-07-20T14:29:41.887Z",
+        "source": "usn-journal",
+        "action": "renamed",
+        "recordNumber": 94,
+        "filePath": null,
+        "detail": "RENAME_OLD_NAME: update.ps1 -> RENAME_NEW_NAME: stage2.ps1",
+        "findingIds": [
+          "f-006"
+        ]
+      },
+      {
+        "timestamp": "2026-07-20T14:32:11.442Z",
+        "source": "mft-fn",
+        "action": "created",
+        "recordNumber": 57,
+        "filePath": "E:\\Tools\\svchost.exe",
+        "detail": "$FN created",
+        "findingIds": [
+          "f-001",
+          "f-002",
+          "f-007"
+        ]
+      },
+      {
+        "timestamp": "2026-07-20T14:32:11.442Z",
+        "source": "mft-fn",
+        "action": "modified",
+        "recordNumber": 57,
+        "filePath": "E:\\Tools\\svchost.exe",
+        "detail": "$FN modified",
+        "findingIds": [
+          "f-001",
+          "f-002",
+          "f-007"
+        ]
+      },
+      {
+        "timestamp": "2026-07-20T14:32:11.442Z",
+        "source": "mft-si",
+        "action": "mft-modified",
+        "recordNumber": 57,
+        "filePath": "E:\\Tools\\svchost.exe",
+        "detail": "$SI mft-modified",
+        "findingIds": [
+          "f-001",
+          "f-002",
+          "f-007"
+        ]
+      },
+      {
+        "timestamp": "2026-07-20T14:32:11.442Z",
+        "source": "mft-fn",
+        "action": "mft-modified",
+        "recordNumber": 57,
+        "filePath": "E:\\Tools\\svchost.exe",
+        "detail": "$FN mft-modified",
+        "findingIds": [
+          "f-001",
+          "f-002",
+          "f-007"
+        ]
+      },
+      {
+        "timestamp": "2026-07-20T14:32:11.442Z",
+        "source": "mft-fn",
+        "action": "accessed",
+        "recordNumber": 57,
+        "filePath": "E:\\Tools\\svchost.exe",
+        "detail": "$FN accessed",
+        "findingIds": [
+          "f-001",
+          "f-002",
+          "f-007"
+        ]
+      },
+      {
+        "timestamp": "2026-07-20T14:32:11.442Z",
+        "source": "usn-journal",
+        "action": "created",
+        "recordNumber": 57,
+        "filePath": "E:\\Tools\\svchost.exe",
+        "detail": "FILE_CREATE|CLOSE",
+        "findingIds": [
+          "f-001"
+        ]
+      },
+      {
+        "timestamp": "2026-07-20T14:33:48.900Z",
+        "source": "mft-fn",
+        "action": "created",
+        "recordNumber": 102,
+        "filePath": "E:\\Tools\\install.log",
+        "detail": "$FN created",
+        "findingIds": [
+          "f-008"
+        ]
+      },
+      {
+        "timestamp": "2026-07-20T14:33:48.900Z",
+        "source": "mft-fn",
+        "action": "modified",
+        "recordNumber": 102,
+        "filePath": "E:\\Tools\\install.log",
+        "detail": "$FN modified",
+        "findingIds": [
+          "f-008"
+        ]
+      },
+      {
+        "timestamp": "2026-07-20T14:33:48.900Z",
+        "source": "mft-si",
+        "action": "mft-modified",
+        "recordNumber": 102,
+        "filePath": "E:\\Tools\\install.log",
+        "detail": "$SI mft-modified",
+        "findingIds": [
+          "f-008"
+        ]
+      },
+      {
+        "timestamp": "2026-07-20T14:33:48.900Z",
+        "source": "mft-fn",
+        "action": "mft-modified",
+        "recordNumber": 102,
+        "filePath": "E:\\Tools\\install.log",
+        "detail": "$FN mft-modified",
+        "findingIds": [
+          "f-008"
+        ]
+      },
+      {
+        "timestamp": "2026-07-20T14:33:48.900Z",
+        "source": "mft-fn",
+        "action": "accessed",
+        "recordNumber": 102,
+        "filePath": "E:\\Tools\\install.log",
+        "detail": "$FN accessed",
+        "findingIds": [
+          "f-008"
+        ]
+      },
+      {
+        "timestamp": "2026-07-20T14:35:02.881Z",
+        "source": "mft-si",
+        "action": "modified",
+        "recordNumber": 63,
+        "filePath": "E:\\Docs\\notes.txt",
+        "detail": "$SI modified",
+        "findingIds": [
+          "f-003"
+        ]
+      },
+      {
+        "timestamp": "2026-07-20T14:35:02.881Z",
+        "source": "mft-si",
+        "action": "mft-modified",
+        "recordNumber": 63,
+        "filePath": "E:\\Docs\\notes.txt",
+        "detail": "$SI mft-modified",
+        "findingIds": [
+          "f-003"
+        ]
+      },
+      {
+        "timestamp": "2026-07-20T14:35:02.881Z",
+        "source": "mft-si",
+        "action": "accessed",
+        "recordNumber": 63,
+        "filePath": "E:\\Docs\\notes.txt",
+        "detail": "$SI accessed",
+        "findingIds": [
+          "f-003"
+        ]
+      },
+      {
+        "timestamp": "2026-07-20T15:10:03.520Z",
+        "source": "mft-si",
+        "action": "created",
+        "recordNumber": 88,
+        "filePath": "E:\\Media\\screen-capture.mp4",
+        "detail": "$SI created",
+        "findingIds": [
+          "f-005"
+        ]
+      },
+      {
+        "timestamp": "2026-07-20T15:10:03.520Z",
+        "source": "mft-fn",
+        "action": "created",
+        "recordNumber": 88,
+        "filePath": "E:\\Media\\screen-capture.mp4",
+        "detail": "$FN created",
+        "findingIds": [
+          "f-005"
+        ]
+      },
+      {
+        "timestamp": "2026-07-20T15:10:03.520Z",
+        "source": "mft-fn",
+        "action": "modified",
+        "recordNumber": 88,
+        "filePath": "E:\\Media\\screen-capture.mp4",
+        "detail": "$FN modified",
+        "findingIds": [
+          "f-005"
+        ]
+      },
+      {
+        "timestamp": "2026-07-20T15:10:03.520Z",
+        "source": "mft-fn",
+        "action": "mft-modified",
+        "recordNumber": 88,
+        "filePath": "E:\\Media\\screen-capture.mp4",
+        "detail": "$FN mft-modified",
+        "findingIds": [
+          "f-005"
+        ]
+      },
+      {
+        "timestamp": "2026-07-20T15:10:03.520Z",
+        "source": "mft-fn",
+        "action": "accessed",
+        "recordNumber": 88,
+        "filePath": "E:\\Media\\screen-capture.mp4",
+        "detail": "$FN accessed",
+        "findingIds": [
+          "f-005"
+        ]
+      },
+      {
+        "timestamp": "2026-07-20T15:22:47.905Z",
+        "source": "mft-si",
+        "action": "modified",
+        "recordNumber": 88,
+        "filePath": "E:\\Media\\screen-capture.mp4",
+        "detail": "$SI modified",
+        "findingIds": [
+          "f-005"
+        ]
+      },
+      {
+        "timestamp": "2026-07-20T15:22:47.905Z",
+        "source": "mft-si",
+        "action": "accessed",
+        "recordNumber": 88,
+        "filePath": "E:\\Media\\screen-capture.mp4",
+        "detail": "$SI accessed",
+        "findingIds": [
+          "f-005"
+        ]
+      },
+      {
+        "timestamp": "2026-07-20T17:55:41.209Z",
+        "source": "mft-si",
+        "action": "modified",
+        "recordNumber": 71,
+        "filePath": "E:\\Docs\\handover-credentials.txt",
+        "detail": "$SI modified",
+        "findingIds": [
+          "f-004"
+        ]
+      },
+      {
+        "timestamp": "2026-07-20T17:55:41.209Z",
+        "source": "mft-si",
+        "action": "accessed",
+        "recordNumber": 71,
+        "filePath": "E:\\Docs\\handover-credentials.txt",
+        "detail": "$SI accessed",
+        "findingIds": [
+          "f-004"
+        ]
+      },
+      {
+        "timestamp": "2026-07-20T18:02:07.115Z",
+        "source": "mft-si",
+        "action": "mft-modified",
+        "recordNumber": 71,
+        "filePath": "E:\\Docs\\handover-credentials.txt",
+        "detail": "$SI mft-modified",
+        "findingIds": [
+          "f-004"
+        ]
+      },
+      {
+        "timestamp": "2026-07-20T18:02:07.115Z",
+        "source": "usn-journal",
+        "action": "deleted",
+        "recordNumber": 71,
+        "filePath": "E:\\Docs\\handover-credentials.txt",
+        "detail": "FILE_DELETE|CLOSE",
+        "findingIds": [
+          "f-004"
+        ]
+      },
+      {
+        "timestamp": "2026-07-20T18:03:19.740Z",
+        "source": "mft-si",
+        "action": "mft-modified",
+        "recordNumber": 88,
+        "filePath": "E:\\Media\\screen-capture.mp4",
+        "detail": "$SI mft-modified",
+        "findingIds": [
+          "f-005"
+        ]
+      },
+      {
+        "timestamp": "2026-07-20T18:03:19.740Z",
+        "source": "usn-journal",
+        "action": "deleted",
+        "recordNumber": 88,
+        "filePath": "E:\\Media\\screen-capture.mp4",
+        "detail": "FILE_DELETE|CLOSE",
+        "findingIds": [
+          "f-005"
+        ]
+      },
+      {
+        "timestamp": "2026-07-20T18:04:55.021Z",
+        "source": "mft-si",
+        "action": "mft-modified",
+        "recordNumber": 94,
+        "filePath": null,
+        "detail": "$SI mft-modified",
+        "findingIds": [
+          "f-006"
+        ]
+      },
+      {
+        "timestamp": "2026-07-20T18:04:55.021Z",
+        "source": "usn-journal",
+        "action": "deleted",
+        "recordNumber": 94,
+        "filePath": null,
+        "detail": "FILE_DELETE|CLOSE",
+        "findingIds": [
+          "f-006"
+        ]
+      },
+      {
+        "timestamp": "2026-07-21T16:48:09.771Z",
+        "source": "mft-si",
+        "action": "modified",
+        "recordNumber": 41,
+        "filePath": "E:\\Docs\\quarterly-report.docx",
+        "detail": "$SI modified",
+        "findingIds": []
+      },
+      {
+        "timestamp": "2026-07-21T16:48:09.771Z",
+        "source": "mft-si",
+        "action": "mft-modified",
+        "recordNumber": 41,
+        "filePath": "E:\\Docs\\quarterly-report.docx",
+        "detail": "$SI mft-modified",
+        "findingIds": []
+      },
+      {
+        "timestamp": "2026-07-21T16:48:09.771Z",
+        "source": "mft-si",
+        "action": "accessed",
+        "recordNumber": 41,
+        "filePath": "E:\\Docs\\quarterly-report.docx",
+        "detail": "$SI accessed",
+        "findingIds": []
+      }
+    ]
+  }
+}

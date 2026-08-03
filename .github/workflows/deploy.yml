@@ -29,10 +29,19 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Typecheck
+        run: npm run typecheck
+
       - name: Build
         run: npm run build
         env:
           VITE_BASE_URL: /ForensicaLite/
+
+      # GitHub Pages has no rewrite rules, so a direct hit on /results would
+      # 404. Serving index.html as the 404 document lets the SPA router
+      # resolve the path client-side.
+      - name: Add SPA fallback
+        run: cp dist/index.html dist/404.html
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

@@ -11,6 +11,22 @@ node_modules
 dist
 dist-ssr
 *.local
+*.tsbuildinfo
+
+# Python / analyzer
+__pycache__/
+*.py[cod]
+build/
+*.spec
+.pytest_cache/
+.venv/
+venv/
+
+# Generated case files — these contain real file paths from a scanned volume
+case*.json
+
+# Machine-local Claude Code settings. launch.json is shared; this is not.
+.claude/settings.local.json
 
 # Editor directories and files
 .vscode/*

@@ -8,9 +8,7 @@ function App() {
     <ThemeProvider>
       <AppProvider>
         <Router basename={import.meta.env.BASE_URL}>
-          <div className="min-h-screen bg-gray-50 dark:bg-slate-900">
-            <AppRoutes />
-          </div>
+          <AppRoutes />
         </Router>
       </AppProvider>
     </ThemeProvider>
