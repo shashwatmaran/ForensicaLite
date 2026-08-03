@@ -65,7 +65,8 @@ either matches the version the app understands or it is rejected with a message 
 ```
 analyzer/
 ├── checkup.py            CLI entry point
-├── build.ps1             PyInstaller build, prints the SHA-256
+├── checkup_gui.py        desktop entry point
+├── build.ps1             builds both exes, prints the SHA-256 values
 ├── pytest.ini
 ├── forensica/
 │   ├── volume.py         raw \\.\X: access, sector-aligned reads
@@ -75,9 +76,37 @@ analyzer/
 │   ├── entries.py        the intermediate file model
 │   ├── findings.py       detectors
 │   ├── filetime.py       FILETIME conversion, whole-second detection
+│   ├── progress.py       progress reporting + cancellation
+│   ├── volumes.py        volume enumeration and elevation, via ctypes
+│   ├── gui.py            tkinter desktop interface
 │   └── analyze.py        orchestration + case file assembly
-└── tests/test_parsing.py
+└── tests/                parsing, end-to-end, GUI
 ```
+
+### Two binaries
+
+`build.ps1` produces both:
+
+| Artifact | Purpose |
+|---|---|
+| `checkup.exe` | Desktop application — volume picker, live progress, cancellable |
+| `checkup-cli.exe` | Console version for scripting |
+
+One binary cannot serve both: a windowed build has no console for CLI output,
+and a console build flashes a black window when the GUI opens.
+
+The interface is **tkinter**, chosen so the analyzer keeps its property of
+having no third-party runtime dependencies. Qt would look better untouched and
+cost roughly forty times the bundle size; as it is, the GUI build is ~10 MB
+against the CLI's ~7 MB, and the difference is Tcl/Tk.
+
+The scan runs on a worker thread and posts to a queue that the UI thread drains
+on a timer — tkinter is not thread-safe, so no widget is ever touched from the
+worker. `run_scan` takes an optional progress callback and cancel check, which
+is how the bar moves and how **Cancel** interrupts a long scan without leaving a
+partial case file behind. Record-level updates are throttled; emitting one per
+MFT record would swamp the queue and make the scan slower than the work it is
+reporting on.
 
 No third-party runtime dependencies — every structure is parsed with the standard library, so the
 path from sector to finding is readable end to end.
@@ -90,10 +119,16 @@ Set up the virtual environment once:
 cd analyzer && python -m venv .venv && .venv/Scripts/python.exe -m pip install -r requirements.txt
 ```
 
-Then run the tests (50 of them, under a second, no volume or privileges needed):
+Then run the tests (84 of them, about a second, no volume or privileges needed):
 
 ```bash
 cd analyzer && .venv/Scripts/python.exe -m pytest -q
+```
+
+Launch the desktop interface from source:
+
+```bash
+cd analyzer && .venv/Scripts/pythonw.exe checkup_gui.py
 ```
 
 Scanning a drive letter needs an elevated prompt, because opening a raw volume handle is privileged.

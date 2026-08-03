@@ -61,29 +61,49 @@ Write-Host '[*] running tests' -ForegroundColor Cyan
 & $python -m pytest -q
 if ($LASTEXITCODE -ne 0) { throw 'tests failed; not building.' }
 
-Write-Host '[*] building' -ForegroundColor Cyan
+# Two artifacts from one codebase:
+#   checkup.exe      windowed GUI - what a person double-clicks
+#   checkup-cli.exe  console CLI  - what a script calls
+# A single binary cannot be both: --windowed leaves no console for CLI output,
+# and --console flashes a black window when the GUI launches.
+
+Write-Host '[*] building GUI' -ForegroundColor Cyan
 & $python -m PyInstaller `
     --onefile `
     --name $Name `
-    --console `
+    --windowed `
     --clean `
     --noconfirm `
     --paths . `
+    checkup_gui.py
+if ($LASTEXITCODE -ne 0) { throw 'PyInstaller failed building the GUI.' }
+
+Write-Host '[*] building CLI' -ForegroundColor Cyan
+& $python -m PyInstaller `
+    --onefile `
+    --name "$Name-cli" `
+    --console `
+    --noconfirm `
+    --paths . `
     checkup.py
-if ($LASTEXITCODE -ne 0) { throw 'PyInstaller failed.' }
-
-$artifact = Join-Path $PSScriptRoot "dist\$Name.exe"
-if (-not (Test-Path $artifact)) { throw "expected artifact not found: $artifact" }
-
-$hash = (Get-FileHash -Algorithm SHA256 -Path $artifact).Hash.ToLower()
-$size = [math]::Round((Get-Item $artifact).Length / 1MB, 1)
+if ($LASTEXITCODE -ne 0) { throw 'PyInstaller failed building the CLI.' }
 
 Write-Host ''
-Write-Host "    artifact  $artifact" -ForegroundColor Green
-Write-Host "    size      $size MB"
-Write-Host "    sha256    $hash"
+foreach ($artifactName in @($Name, "$Name-cli")) {
+    $artifact = Join-Path $PSScriptRoot "dist\$artifactName.exe"
+    if (-not (Test-Path $artifact)) { throw "expected artifact not found: $artifact" }
+
+    $hash = (Get-FileHash -Algorithm SHA256 -Path $artifact).Hash.ToLower()
+    $bytes = (Get-Item $artifact).Length
+    $size = [math]::Round($bytes / 1MB, 1)
+
+    Write-Host "    $artifactName.exe" -ForegroundColor Green
+    Write-Host "      size    $size MB ($bytes bytes)"
+    Write-Host "      sha256  $hash"
+}
+
 Write-Host ''
-Write-Host 'Attach the exe to a GitHub Release and publish the SHA-256 with it.'
+Write-Host 'Attach both to a GitHub Release and publish the SHA-256 values with them.'
 
 # An unsigned PyInstaller binary is exactly what Smart App Control exists to
 # block, so warn at build time rather than letting it fail mysteriously later.

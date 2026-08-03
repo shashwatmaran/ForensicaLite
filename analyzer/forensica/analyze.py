@@ -21,6 +21,7 @@ from . import SCHEMA_VERSION, __version__, bitmap as bitmap_module, boot as boot
 from .entries import FileEntry, StreamInfo
 from .filetime import filetime_to_iso, now_iso, to_timestamp
 from .findings import is_filesystem_metadata, run_detectors
+from .progress import CancelCheck, ProgressCallback, Reporter
 from .mft import (
     ATTR_DATA,
     ATTR_STANDARD_INFORMATION,
@@ -673,21 +674,36 @@ def _select_emitted(
 # ---------------------------------------------------------------------------
 
 
-def run_scan(options: ScanOptions) -> Dict[str, Any]:
+def run_scan(
+    options: ScanOptions,
+    on_progress: Optional[ProgressCallback] = None,
+    should_cancel: Optional[CancelCheck] = None,
+) -> Dict[str, Any]:
+    """
+    Scan a volume and build the case file.
+
+    `on_progress` receives Progress updates for a progress bar; `should_cancel`
+    is polled during the record loop so a UI can interrupt a long scan. Both are
+    optional — the CLI and the tests pass neither.
+    """
     started_monotonic = time.monotonic()
     started_at = now_iso()
 
     path = device_path(options.target)
     prefix = _drive_prefix(options.target)
     context = ScanContext()
+    reporter = Reporter(on_progress, should_cancel)
 
     def log(message: str) -> None:
         if not options.quiet:
             print(message, flush=True)
 
+    reporter.stage("open", f"Opening {path}")
+
     with RawVolume(path) as volume:
         log(f"[*] opened {path}")
 
+        reporter.stage("boot", "Reading boot sector")
         boot = boot_module.parse(volume.read(0, 512))
         log(
             f"[*] NTFS: {boot.bytes_per_cluster} B/cluster, "
@@ -707,7 +723,14 @@ def run_scan(options: ScanOptions) -> Dict[str, Any]:
 
         entries: Dict[int, FileEntry] = {}
 
+        reporter.stage("mft", f"Parsing {limit} MFT records", 0, limit)
+
         for number in range(limit):
+            # Cancellation is checked here rather than per stage: the record
+            # loop is where essentially all the time goes.
+            reporter.checkpoint()
+            reporter.records("mft", "Parsing $MFT", number, limit)
+
             entry = _build_entry(reader, number, context)
 
             if number == RECORD_VOLUME:
@@ -749,8 +772,10 @@ def run_scan(options: ScanOptions) -> Dict[str, Any]:
 
             entries[entry.record_number] = entry
 
+        reporter.records("mft", "Parsing $MFT", limit, limit)
         log(f"[*] parsed {context.records_parsed} records ({context.records_deleted} deleted)")
 
+        reporter.stage("paths", f"Reconstructing paths for {len(entries)} records")
         _resolve_paths(entries, prefix)
 
         # Reserved records 0-11 are excluded by number, but $Extend's children
@@ -771,7 +796,16 @@ def run_scan(options: ScanOptions) -> Dict[str, Any]:
         if metadata_records:
             log(f"[*] suppressed {metadata_records} NTFS metadata records")
 
-        for entry in user_entries:
+        # Hashing reads stream content off the disk, so this stage can take
+        # noticeably longer than parsing on a volume with large files.
+        reporter.stage(
+            "recovery", "Assessing recovery and hashing", 0, len(user_entries)
+        )
+
+        for index, entry in enumerate(user_entries):
+            reporter.checkpoint()
+            reporter.records("recovery", "Assessing recovery", index, len(user_entries))
+
             _assess_recovery(entry, volume, boot.bytes_per_cluster, cluster_bitmap, context)
 
             record_bytes: Optional[bytes] = None
@@ -785,9 +819,12 @@ def run_scan(options: ScanOptions) -> Dict[str, Any]:
                 entry, volume, boot.bytes_per_cluster, options, record_bytes, context
             )
 
+        reporter.records("recovery", "Assessing recovery", len(user_entries), len(user_entries))
+
         completed_at = now_iso()
         scan_completed_filetime = _iso_to_filetime(completed_at)
 
+        reporter.stage("detect", "Running detectors")
         findings = run_detectors(
             user_entries,
             volume_created=volume_created,
@@ -795,6 +832,7 @@ def run_scan(options: ScanOptions) -> Dict[str, Any]:
         )
         log(f"[*] {len(findings)} findings raised")
 
+        reporter.stage("report", "Building case file")
         statistics = _build_statistics(user_entries, findings)
         emitted, inclusion_policy = _select_emitted(user_entries, options)
 
