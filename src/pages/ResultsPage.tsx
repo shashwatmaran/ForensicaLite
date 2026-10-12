@@ -7,8 +7,10 @@ import Timeline from '../components/results/Timeline';
 import Records from '../components/results/Records';
 import Stats from '../components/results/Stats';
 import { useAppContext } from '../context/hooks';
-import { Mono, Notice } from '../components/ui/primitives';
+import { Button, Mono, Notice } from '../components/ui/primitives';
 import { formatFileSize, formatNumber } from '../utils/formatters';
+import { buildFindingsCsv, buildReportHtml } from '../utils/report';
+import { downloadBytes } from '../utils/bytes';
 
 /**
  * The report, navigated by section from the rail.
@@ -19,6 +21,11 @@ import { formatFileSize, formatNumber } from '../utils/formatters';
  */
 
 type SectionId = 'overview' | 'findings' | 'timeline' | 'records' | 'stats';
+
+const safeName = (caseId: string) => caseId.replace(/[^A-Za-z0-9._-]/g, '_');
+
+const exportText = (text: string, fileName: string, type: string) =>
+  downloadBytes(new TextEncoder().encode(text), fileName, type);
 
 const ResultsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -102,6 +109,31 @@ const ResultsPage: React.FC = () => {
             {volume.label ?? 'unlabelled'}
             {volume.driveLetter ? ` · ${volume.driveLetter}` : ''}
           </span>
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            <Button
+              onClick={() =>
+                exportText(
+                  buildFindingsCsv(caseData),
+                  `${safeName(scan.caseId)}-findings.csv`,
+                  'text/csv;charset=utf-8'
+                )
+              }
+            >
+              Findings CSV
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() =>
+                exportText(
+                  buildReportHtml(caseData),
+                  `${safeName(scan.caseId)}-report.html`,
+                  'text/html;charset=utf-8'
+                )
+              }
+            >
+              Export report
+            </Button>
+          </div>
         </div>
       }
     >

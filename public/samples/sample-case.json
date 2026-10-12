@@ -247,7 +247,7 @@
       "evidence": [
         {
           "label": "Residency",
-          "value": "resident (412 bytes)",
+          "value": "resident (157 bytes)",
           "note": "below the ~700 byte threshold"
         },
         {
@@ -257,7 +257,7 @@
         },
         {
           "label": "Recovered",
-          "value": "412 of 412 bytes",
+          "value": "157 of 157 bytes",
           "note": "complete"
         },
         {
@@ -611,7 +611,7 @@
         "fileName": "handover-credentials.txt",
         "filePath": "E:\\Docs\\handover-credentials.txt",
         "isDirectory": false,
-        "size": 412,
+        "size": 157,
         "allocatedSize": 0,
         "isAllocated": false,
         "status": "deleted",
@@ -657,14 +657,18 @@
         "streams": [
           {
             "name": "",
-            "size": 412,
+            "size": 157,
             "residency": "resident",
-            "hash": null
+            "hash": {
+              "algorithm": "sha256",
+              "value": "a1fdee4da15d3ad6d87aa773240be08dd98dc349e006ae0048ab62319478bd56",
+              "scope": "stream-content"
+            }
           }
         ],
         "recovery": {
           "confidence": "full",
-          "reason": "Stream was resident: all 412 bytes live inside MFT record 71 and were never written to disk clusters, so deletion left the content intact.",
+          "reason": "Stream was resident: all 157 bytes live inside MFT record 71 and were never written to disk clusters, so deletion left the content intact.",
           "residentContentBase64": "IyBIYW5kb3ZlciBub3RlcyAtIGRlbGV0ZSBiZWZvcmUgbGVhdmluZwpqdW1wIGhvc3Q6IDEwLjE0LjIyLjgKc2VydmljZSBhY2NvdW50OiBzdmNfYmFja3VwCnNoYXJlZCB2YXVsdCBwYXRoOiBcXGZpbGVzZXJ2ZXJcb3BzXHZhdWx0CnJvdGF0aW9uIGR1ZTogMjAyNi0wOC0wMQ==",
           "dataRuns": [],
           "clustersReallocated": null

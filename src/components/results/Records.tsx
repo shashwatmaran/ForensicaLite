@@ -18,6 +18,7 @@ import {
   SegmentedOption,
   Tag,
 } from '../ui/primitives';
+import RecoveredContent from './RecoveredContent';
 
 /**
  * The MFT record browser.
@@ -60,21 +61,8 @@ const MACB_ROWS: { key: keyof NtfsTimestamps; label: string; macb: string }[] = 
   { key: 'accessed', label: 'Accessed', macb: 'A' },
 ];
 
-const decodeResident = (base64: string): string | null => {
-  try {
-    const binary = atob(base64);
-    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
-    return new TextDecoder('utf-8', { fatal: false }).decode(bytes);
-  } catch {
-    return null;
-  }
-};
-
 const RecordDetail: React.FC<{ file: MftFile }> = ({ file }) => {
-  const ads = alternateStreams(file);
-  const recovered = file.recovery?.residentContentBase64
-    ? decodeResident(file.recovery.residentContentBase64)
-    : null;
+  const residentContent = file.recovery?.residentContentBase64 ?? null;
 
   return (
     <div className="border-t border-ink-800 bg-ink-950/40 light:border-ink-100 light:bg-ink-25">
@@ -217,14 +205,9 @@ const RecordDetail: React.FC<{ file: MftFile }> = ({ file }) => {
         </div>
       </div>
 
-      {recovered !== null && (
+      {residentContent !== null && (
         <div className="border-t border-ink-800 px-4 py-3 light:border-ink-100">
-          <p className="eyebrow mb-2">
-            Recovered content &mdash; {ads.length > 0 ? 'resident stream' : 'from MFT record'}
-          </p>
-          <pre className="max-h-52 overflow-auto rounded border border-ink-800 bg-ink-950 p-3 font-mono text-xs leading-relaxed text-accent-300 light:border-ink-100 light:bg-ink-25 light:text-accent-800">
-            {recovered}
-          </pre>
+          <RecoveredContent file={file} base64={residentContent} />
         </div>
       )}
     </div>

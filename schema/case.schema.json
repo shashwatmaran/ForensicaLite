@@ -1,0 +1,954 @@
+{
+  "$ref": "#/definitions/CaseFile",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "ArtifactHash": {
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": {
+          "const": "sha256",
+          "type": "string"
+        },
+        "scope": {
+          "description": "What was actually hashed. You can only hash bytes you could read, and conflating \"hash of the file\" with \"hash of its MFT record\" would be a misrepresentation.",
+          "enum": [
+            "stream-content",
+            "mft-record"
+          ],
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "algorithm",
+        "value",
+        "scope"
+      ],
+      "type": "object"
+    },
+    "CaseFile": {
+      "additionalProperties": false,
+      "properties": {
+        "files": {
+          "$ref": "#/definitions/Collection%3CMftFile%3E"
+        },
+        "findings": {
+          "items": {
+            "$ref": "#/definitions/Finding"
+          },
+          "type": "array"
+        },
+        "generator": {
+          "$ref": "#/definitions/Generator"
+        },
+        "scan": {
+          "$ref": "#/definitions/ScanInfo"
+        },
+        "schemaVersion": {
+          "type": "number"
+        },
+        "statistics": {
+          "$ref": "#/definitions/Statistics"
+        },
+        "timeline": {
+          "$ref": "#/definitions/Collection%3CTimelineEntry%3E"
+        },
+        "volume": {
+          "$ref": "#/definitions/VolumeInfo"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "generator",
+        "volume",
+        "scan",
+        "statistics",
+        "findings",
+        "files",
+        "timeline"
+      ],
+      "type": "object"
+    },
+    "Collection<MftFile>": {
+      "additionalProperties": false,
+      "description": "A bounded slice of a potentially enormous data set.\n\nA real NTFS volume has hundreds of thousands to millions of MFT records. The analyzer deliberately does not emit all of them by default; it emits a triaged subset and reports honestly how much was left out, so the UI can say \"showing 4,812 of 812,455 records\" instead of implying completeness.",
+      "properties": {
+        "entries": {
+          "items": {
+            "$ref": "#/definitions/MftFile"
+          },
+          "type": "array"
+        },
+        "includedCount": {
+          "type": "number"
+        },
+        "inclusionPolicy": {
+          "description": "Human-readable description of why these entries and not others.",
+          "type": "string"
+        },
+        "totalCount": {
+          "type": "number"
+        },
+        "truncated": {
+          "description": "True when `entries` is a subset of what the analyzer actually parsed.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "truncated",
+        "includedCount",
+        "totalCount",
+        "inclusionPolicy",
+        "entries"
+      ],
+      "type": "object"
+    },
+    "Collection<TimelineEntry>": {
+      "additionalProperties": false,
+      "description": "A bounded slice of a potentially enormous data set.\n\nA real NTFS volume has hundreds of thousands to millions of MFT records. The analyzer deliberately does not emit all of them by default; it emits a triaged subset and reports honestly how much was left out, so the UI can say \"showing 4,812 of 812,455 records\" instead of implying completeness.",
+      "properties": {
+        "entries": {
+          "items": {
+            "$ref": "#/definitions/TimelineEntry"
+          },
+          "type": "array"
+        },
+        "includedCount": {
+          "type": "number"
+        },
+        "inclusionPolicy": {
+          "description": "Human-readable description of why these entries and not others.",
+          "type": "string"
+        },
+        "totalCount": {
+          "type": "number"
+        },
+        "truncated": {
+          "description": "True when `entries` is a subset of what the analyzer actually parsed.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "truncated",
+        "includedCount",
+        "totalCount",
+        "inclusionPolicy",
+        "entries"
+      ],
+      "type": "object"
+    },
+    "Confidence": {
+      "enum": [
+        "high",
+        "medium",
+        "low"
+      ],
+      "type": "string"
+    },
+    "DataRun": {
+      "additionalProperties": false,
+      "properties": {
+        "clusterCount": {
+          "type": "number"
+        },
+        "startCluster": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "startCluster",
+        "clusterCount"
+      ],
+      "type": "object"
+    },
+    "DataStream": {
+      "additionalProperties": false,
+      "properties": {
+        "hash": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ArtifactHash"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "description": "\"\" for the default stream; anything else is an Alternate Data Stream.",
+          "type": "string"
+        },
+        "residency": {
+          "$ref": "#/definitions/Residency"
+        },
+        "size": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "name",
+        "size",
+        "residency",
+        "hash"
+      ],
+      "type": "object"
+    },
+    "Evidence": {
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "note": {
+          "description": "Optional explanation of why this value matters.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "label",
+        "value",
+        "note"
+      ],
+      "type": "object"
+    },
+    "FileCounts": {
+      "additionalProperties": false,
+      "properties": {
+        "active": {
+          "type": "number"
+        },
+        "deleted": {
+          "type": "number"
+        },
+        "directories": {
+          "type": "number"
+        },
+        "orphaned": {
+          "type": "number"
+        },
+        "timestomped": {
+          "type": "number"
+        },
+        "total": {
+          "type": "number"
+        },
+        "withAlternateStreams": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "total",
+        "active",
+        "deleted",
+        "directories",
+        "withAlternateStreams",
+        "timestomped",
+        "orphaned"
+      ],
+      "type": "object"
+    },
+    "FileStatus": {
+      "enum": [
+        "active",
+        "deleted"
+      ],
+      "type": "string"
+    },
+    "Finding": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "$ref": "#/definitions/Confidence"
+        },
+        "description": {
+          "type": "string"
+        },
+        "detectedBy": {
+          "description": "Identifier of the specific heuristic that fired, e.g. \"si-fn-created-mismatch\" or \"si-subsecond-zeroed\". Naming the detector makes a finding auditable instead of an opaque verdict.",
+          "type": "string"
+        },
+        "evidence": {
+          "description": "The raw values the conclusion rests on. Every claim shows its work.",
+          "items": {
+            "$ref": "#/definitions/Evidence"
+          },
+          "type": "array"
+        },
+        "filePath": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "description": "Stable within a case file; referenced by MftFile.findingIds.",
+          "type": "string"
+        },
+        "recordNumber": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "severity": {
+          "$ref": "#/definitions/Severity"
+        },
+        "title": {
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/definitions/FindingType"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "severity",
+        "title",
+        "description",
+        "recordNumber",
+        "filePath",
+        "detectedBy",
+        "confidence",
+        "evidence"
+      ],
+      "type": "object"
+    },
+    "FindingType": {
+      "enum": [
+        "timestomp",
+        "alternate-data-stream",
+        "deleted-recoverable",
+        "orphaned-file",
+        "impossible-timestamp",
+        "hidden-system-file"
+      ],
+      "type": "string"
+    },
+    "Generator": {
+      "additionalProperties": false,
+      "properties": {
+        "builtAt": {
+          "description": "When this build of the analyzer was produced.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tool": {
+          "description": "Tool name, e.g. \"checkup\".",
+          "type": "string"
+        },
+        "version": {
+          "description": "Analyzer version, semver.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tool",
+        "version",
+        "builtAt"
+      ],
+      "type": "object"
+    },
+    "HistogramBucket": {
+      "additionalProperties": false,
+      "properties": {
+        "accessed": {
+          "type": "number"
+        },
+        "created": {
+          "type": "number"
+        },
+        "date": {
+          "description": "YYYY-MM-DD, UTC.",
+          "type": "string"
+        },
+        "deleted": {
+          "type": "number"
+        },
+        "modified": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "date",
+        "created",
+        "modified",
+        "accessed",
+        "deleted"
+      ],
+      "type": "object"
+    },
+    "MftFile": {
+      "additionalProperties": false,
+      "properties": {
+        "allocatedSize": {
+          "description": "Size actually allocated on disk (cluster-rounded).",
+          "type": "number"
+        },
+        "attributes": {
+          "description": "DOS attribute flags, e.g. [\"HIDDEN\", \"SYSTEM\", \"ARCHIVE\"].",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "fileName": {
+          "type": "string"
+        },
+        "fileNameInfo": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/NtfsTimestamps"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "$FILE_NAME (attribute type 0x30) — kernel-maintained, only updated on create/rename/move. Divergence from standardInfo is the timestomp tell. Null when the attribute is missing or unparseable."
+        },
+        "filePath": {
+          "description": "Full path reconstructed by walking parentRecordNumber up to the root. Null when the chain breaks — see the 'orphaned-file' finding.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "findingIds": {
+          "description": "Ids of findings referencing this record.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "isAllocated": {
+          "description": "MFT record header in-use flag. False means the record was deleted.",
+          "type": "boolean"
+        },
+        "isDirectory": {
+          "type": "boolean"
+        },
+        "parentRecordNumber": {
+          "description": "MFT record of the containing directory, from $FILE_NAME.",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "recordNumber": {
+          "description": "MFT entry index — the stable identity of a file at the filesystem level.",
+          "type": "number"
+        },
+        "recovery": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RecoveryInfo"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sequenceNumber": {
+          "description": "Bumped each time the record is reused; detects stale references.",
+          "type": "number"
+        },
+        "size": {
+          "description": "Logical size of the default $DATA stream.",
+          "type": "number"
+        },
+        "standardInfo": {
+          "$ref": "#/definitions/NtfsTimestamps",
+          "description": "$STANDARD_INFORMATION (attribute type 0x10) — user-settable."
+        },
+        "status": {
+          "$ref": "#/definitions/FileStatus"
+        },
+        "streams": {
+          "description": "Every $DATA stream on the record. The unnamed default stream has name \"\".",
+          "items": {
+            "$ref": "#/definitions/DataStream"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "recordNumber",
+        "sequenceNumber",
+        "parentRecordNumber",
+        "fileName",
+        "filePath",
+        "isDirectory",
+        "size",
+        "allocatedSize",
+        "isAllocated",
+        "status",
+        "attributes",
+        "standardInfo",
+        "fileNameInfo",
+        "streams",
+        "recovery",
+        "findingIds"
+      ],
+      "type": "object"
+    },
+    "NtfsTimestamp": {
+      "additionalProperties": false,
+      "description": "A single NTFS timestamp, keeping the raw FILETIME so that sub-second precision survives. Many timestomping tools write whole-second values, leaving the 100ns remainder at zero — a detectable artifact that is lost if you only keep the ISO string.",
+      "properties": {
+        "filetime": {
+          "description": "Raw 64-bit FILETIME (100ns intervals since 1601-01-01), as a string to survive JSON's 53-bit integer limit.",
+          "type": "string"
+        },
+        "iso": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "iso",
+        "filetime"
+      ],
+      "type": "object"
+    },
+    "NtfsTimestamps": {
+      "additionalProperties": false,
+      "description": "The MACB set carried by both $STANDARD_INFORMATION and $FILE_NAME.\n\n modified    (M) — content last written  accessed    (A) — last read; often disabled on modern Windows  mftModified (C) — MFT record itself last changed  created     (B) — \"born\"",
+      "properties": {
+        "accessed": {
+          "$ref": "#/definitions/NtfsTimestamp"
+        },
+        "created": {
+          "$ref": "#/definitions/NtfsTimestamp"
+        },
+        "mftModified": {
+          "$ref": "#/definitions/NtfsTimestamp"
+        },
+        "modified": {
+          "$ref": "#/definitions/NtfsTimestamp"
+        }
+      },
+      "required": [
+        "created",
+        "modified",
+        "mftModified",
+        "accessed"
+      ],
+      "type": "object"
+    },
+    "RecoveryConfidence": {
+      "description": "How much of a deleted file can be brought back.\n\n full          — the stream was resident, so its bytes are still intact                  inside the MFT record. Byte-for-byte recovery.  partial       — non-resident with data runs still readable, but the                  clusters may since have been reallocated to another file.  metadata-only — runs unavailable or demonstrably overwritten; the record                  proves the file existed but the content is gone.",
+      "enum": [
+        "full",
+        "partial",
+        "metadata-only"
+      ],
+      "type": "string"
+    },
+    "RecoveryInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "clustersReallocated": {
+          "description": "True when at least one run is now claimed by an allocated file.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "confidence": {
+          "$ref": "#/definitions/RecoveryConfidence"
+        },
+        "dataRuns": {
+          "description": "Cluster ranges holding the content, for non-resident streams.",
+          "items": {
+            "$ref": "#/definitions/DataRun"
+          },
+          "type": "array"
+        },
+        "reason": {
+          "description": "Plain-English justification, surfaced directly in the UI.",
+          "type": "string"
+        },
+        "residentContentBase64": {
+          "description": "Bytes recovered inline from the MFT record, base64. Null if non-resident.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "confidence",
+        "reason",
+        "residentContentBase64",
+        "dataRuns",
+        "clustersReallocated"
+      ],
+      "type": "object"
+    },
+    "Residency": {
+      "description": "Where a stream's bytes live.  resident     — inside the MFT record itself (small files, < ~700 bytes)  non-resident — in clusters elsewhere on the volume, described by data runs",
+      "enum": [
+        "resident",
+        "non-resident"
+      ],
+      "type": "string"
+    },
+    "ScanError": {
+      "additionalProperties": false,
+      "properties": {
+        "message": {
+          "type": "string"
+        },
+        "recordNumber": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "stage": {
+          "description": "Pipeline stage: \"boot\", \"mft\", \"attribute\", \"usn\", \"hash\".",
+          "type": "string"
+        }
+      },
+      "required": [
+        "stage",
+        "recordNumber",
+        "message"
+      ],
+      "type": "object"
+    },
+    "ScanInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "caseId": {
+          "type": "string"
+        },
+        "completedAt": {
+          "type": "string"
+        },
+        "durationSeconds": {
+          "type": "number"
+        },
+        "errors": {
+          "description": "Non-fatal parse failures. A forensic tool reports what it could not read rather than silently dropping it — absence of evidence is itself evidence.",
+          "items": {
+            "$ref": "#/definitions/ScanError"
+          },
+          "type": "array"
+        },
+        "filesRecovered": {
+          "description": "Deleted records for which at least some content was recovered.",
+          "type": "number"
+        },
+        "hostname": {
+          "description": "Machine the analyzer ran on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "mftRecordsDeleted": {
+          "description": "Records whose in-use flag is clear but which still hold a parseable file.",
+          "type": "number"
+        },
+        "mftRecordsInUse": {
+          "type": "number"
+        },
+        "mftRecordsParsed": {
+          "type": "number"
+        },
+        "operator": {
+          "description": "Account the analyzer ran as, e.g. \"DESKTOP-1\\\\anide\".",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "startedAt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "caseId",
+        "startedAt",
+        "completedAt",
+        "durationSeconds",
+        "hostname",
+        "operator",
+        "mftRecordsParsed",
+        "mftRecordsInUse",
+        "mftRecordsDeleted",
+        "filesRecovered",
+        "errors"
+      ],
+      "type": "object"
+    },
+    "Severity": {
+      "enum": [
+        "critical",
+        "high",
+        "medium",
+        "low",
+        "info"
+      ],
+      "type": "string"
+    },
+    "SizeBucket": {
+      "additionalProperties": false,
+      "properties": {
+        "count": {
+          "type": "number"
+        },
+        "label": {
+          "type": "string"
+        },
+        "maxBytes": {
+          "description": "Exclusive upper bound; null for the open-ended top bucket.",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "minBytes": {
+          "description": "Inclusive lower bound in bytes.",
+          "type": "number"
+        }
+      },
+      "required": [
+        "label",
+        "minBytes",
+        "maxBytes",
+        "count"
+      ],
+      "type": "object"
+    },
+    "Statistics": {
+      "additionalProperties": false,
+      "properties": {
+        "fileCounts": {
+          "$ref": "#/definitions/FileCounts"
+        },
+        "fileTypes": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "Extension category -> count. Open-ended so the analyzer can add buckets.",
+          "type": "object"
+        },
+        "findingsBySeverity": {
+          "additionalProperties": false,
+          "properties": {
+            "critical": {
+              "type": "number"
+            },
+            "high": {
+              "type": "number"
+            },
+            "info": {
+              "type": "number"
+            },
+            "low": {
+              "type": "number"
+            },
+            "medium": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "critical",
+            "high",
+            "medium",
+            "low",
+            "info"
+          ],
+          "type": "object"
+        },
+        "findingsByType": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "type": "object"
+        },
+        "histogram": {
+          "description": "Pre-aggregated per-day counts, so the chart never walks the full timeline.",
+          "items": {
+            "$ref": "#/definitions/HistogramBucket"
+          },
+          "type": "array"
+        },
+        "sizeBuckets": {
+          "items": {
+            "$ref": "#/definitions/SizeBucket"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "fileCounts",
+        "fileTypes",
+        "sizeBuckets",
+        "histogram",
+        "findingsBySeverity",
+        "findingsByType"
+      ],
+      "type": "object"
+    },
+    "TimelineAction": {
+      "enum": [
+        "created",
+        "modified",
+        "accessed",
+        "mft-modified",
+        "deleted",
+        "renamed",
+        "moved"
+      ],
+      "type": "string"
+    },
+    "TimelineEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "$ref": "#/definitions/TimelineAction"
+        },
+        "detail": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "filePath": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "findingIds": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "recordNumber": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "source": {
+          "$ref": "#/definitions/TimelineSource"
+        },
+        "timestamp": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "timestamp",
+        "source",
+        "action",
+        "recordNumber",
+        "filePath",
+        "detail",
+        "findingIds"
+      ],
+      "type": "object"
+    },
+    "TimelineSource": {
+      "description": "Which artifact contributed the entry — provenance for every timeline row.",
+      "enum": [
+        "mft-si",
+        "mft-fn",
+        "usn-journal"
+      ],
+      "type": "string"
+    },
+    "VolumeInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "bytesPerCluster": {
+          "type": "number"
+        },
+        "bytesPerSector": {
+          "type": "number"
+        },
+        "createdAt": {
+          "description": "Volume creation time, taken from the $VOLUME_INFORMATION attribute's containing record. Used to flag files claiming to predate their own disk.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "driveLetter": {
+          "description": "e.g. \"E:\" — null when the analyzer worked from a raw image.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "fileSystem": {
+          "const": "NTFS",
+          "type": "string"
+        },
+        "label": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "mftRecordSize": {
+          "description": "Almost always 1024.",
+          "type": "number"
+        },
+        "mftRecordsTotal": {
+          "description": "Total record slots in $MFT, allocated or not.",
+          "type": "number"
+        },
+        "mftStartCluster": {
+          "description": "Logical cluster number where $MFT begins.",
+          "type": "number"
+        },
+        "sectorsPerCluster": {
+          "type": "number"
+        },
+        "serialNumber": {
+          "description": "NTFS volume serial number, lowercase hex.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "totalBytes": {
+          "type": "number"
+        },
+        "totalClusters": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "label",
+        "driveLetter",
+        "serialNumber",
+        "fileSystem",
+        "bytesPerSector",
+        "sectorsPerCluster",
+        "bytesPerCluster",
+        "totalClusters",
+        "totalBytes",
+        "mftStartCluster",
+        "mftRecordSize",
+        "mftRecordsTotal",
+        "createdAt"
+      ],
+      "type": "object"
+    }
+  }
+}

@@ -9,6 +9,7 @@
  * Run: node scripts/make-sample-case.mjs
  */
 
+import { createHash } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -35,6 +36,19 @@ const macb = (created, modified, mftModified, accessed) => ({
 });
 
 const b64 = (text) => Buffer.from(text, 'utf8').toString('base64');
+const sha256 = (text) => createHash('sha256').update(text, 'utf8').digest('hex');
+
+// The deleted resident file's content. Its size, hash and the finding's
+// evidence all derive from it, so the sample cannot claim a size that its own
+// recovered bytes contradict.
+const HANDOVER_NOTES = [
+  '# Handover notes - delete before leaving',
+  'jump host: 10.14.22.8',
+  'service account: svc_backup',
+  'shared vault path: \\\\fileserver\\ops\\vault',
+  'rotation due: 2026-08-01',
+].join('\n');
+const HANDOVER_SIZE = Buffer.byteLength(HANDOVER_NOTES, 'utf8');
 
 const VOLUME_CREATED = '2026-07-18T09:14:02.187Z';
 
@@ -186,7 +200,7 @@ const files = [
     fileName: 'handover-credentials.txt',
     filePath: 'E:\\Docs\\handover-credentials.txt',
     isDirectory: false,
-    size: 412,
+    size: HANDOVER_SIZE,
     allocatedSize: 0,
     isAllocated: false,
     status: 'deleted',
@@ -203,21 +217,20 @@ const files = [
       '2026-07-19T09:41:12.663Z',
       '2026-07-19T09:41:12.663Z'
     ),
-    streams: [{ name: '', size: 412, residency: 'resident', hash: null }],
+    streams: [
+      {
+        name: '',
+        size: HANDOVER_SIZE,
+        residency: 'resident',
+        hash: { algorithm: 'sha256', value: sha256(HANDOVER_NOTES), scope: 'stream-content' },
+      },
+    ],
     recovery: {
       confidence: 'full',
       reason:
-        'Stream was resident: all 412 bytes live inside MFT record 71 and were ' +
+        `Stream was resident: all ${HANDOVER_SIZE} bytes live inside MFT record 71 and were ` +
         'never written to disk clusters, so deletion left the content intact.',
-      residentContentBase64: b64(
-        [
-          '# Handover notes - delete before leaving',
-          'jump host: 10.14.22.8',
-          'service account: svc_backup',
-          'shared vault path: \\\\fileserver\\ops\\vault',
-          'rotation due: 2026-08-01',
-        ].join('\n')
-      ),
+      residentContentBase64: b64(HANDOVER_NOTES),
       dataRuns: [],
       clustersReallocated: null,
     },
@@ -439,9 +452,9 @@ const findings = [
     detectedBy: 'deleted-resident-content',
     confidence: 'high',
     evidence: [
-      { label: 'Residency', value: 'resident (412 bytes)', note: 'below the ~700 byte threshold' },
+      { label: 'Residency', value: `resident (${HANDOVER_SIZE} bytes)`, note: 'below the ~700 byte threshold' },
       { label: 'Record in-use flag', value: 'clear', note: 'deleted' },
-      { label: 'Recovered', value: '412 of 412 bytes', note: 'complete' },
+      { label: 'Recovered', value: `${HANDOVER_SIZE} of ${HANDOVER_SIZE} bytes`, note: 'complete' },
       {
         label: 'Deleted at',
         value: '2026-07-20T18:02:07.115Z',

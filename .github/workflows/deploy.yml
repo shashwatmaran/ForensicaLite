@@ -59,6 +59,18 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # The contract test runs the analyzer against the synthetic image and
+      # validates its output against the schema generated from case.ts.
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Test
+        run: npm test
+        env:
+          PYTHON: python
+
       - name: Build
         run: npm run build
         env:
