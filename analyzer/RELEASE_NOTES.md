@@ -18,13 +18,13 @@ black window when the GUI opens.
 ## Verify the download
 
 ```
-checkup.exe      10,594,782 bytes
-  sha256         6ba56d277143ce88315eee3185c227a97eb3eaf4cb16b30359a8a07d6a4855cc
+checkup.exe      10,660,457 bytes
+  sha256         7ad5032c117f54d47faeafa3a69d63ee1f89547a8e02a496b16b9f54e75d250f
 
-checkup-cli.exe   7,459,723 bytes
-  sha256         b2b2f8872b963db949dab7b4f6844286553e1846f5e980c48c5c37dad21657ff
+checkup-cli.exe   7,520,489 bytes
+  sha256         59c45675932d45a1f117e470e39b98d06aca77a57dbcdfdd9301388c53f79b23
 
-Built            Python 3.12.10, PyInstaller 6.21.0
+Built            Python 3.13.15, PyInstaller 6.22.3
 ```
 
 ```powershell
@@ -90,6 +90,8 @@ checkup.exe E: -o case.json          # scan drive E:
 checkup.exe disk.img -o case.json    # scan an image, no admin needed
 checkup.exe E: --full                # emit every record, not the triaged subset
 checkup.exe E: --max-records 50000   # stop early on a large volume
+checkup.exe E: --usn-limit 268435456 # read up to 256 MiB of the USN journal
+checkup.exe E: --no-usn              # skip the journal
 ```
 
 Upload the resulting JSON at the web app. Nothing is transmitted — it is a
@@ -99,39 +101,51 @@ static site with no backend.
 
 | Detector | Mechanism |
 |---|---|
-| `si-fn-created-mismatch` | `$STANDARD_INFORMATION` is writable from user mode; `$FILE_NAME` is kernel-only. `$SI` earlier than `$FN` cannot occur normally. |
+| `si-fn-created-mismatch`, `si-fn-modified-mismatch` | `$STANDARD_INFORMATION` is writable from user mode; `$FILE_NAME` is kernel-only. `$SI` earlier than `$FN` cannot occur normally. Cites the USN journal's `BASIC_INFO_CHANGE` when present. |
 | `si-subsecond-zeroed` | NTFS counts in 100ns intervals. Whole-second values across every field suggest a timestomping tool. |
 | `si-before-volume-creation` | A file cannot predate the filesystem containing it. |
+| `si-timestamp-in-future` | `$SI` created or modified later than the scan itself. |
 | `named-data-stream-present` | Alternate Data Streams — invisible to Explorer and `dir`. |
 | `deleted-resident-content` | Files under ~700 bytes live inside the MFT record; deletion leaves them byte-for-byte intact. |
 | `deleted-nonresident-runs` | Recoverability graded against `$Bitmap` cluster reuse. |
 | `parent-sequence-mismatch` | Orphaned records whose parent directory has been reused. |
 | `hidden-system-outside-system-path` | HIDDEN+SYSTEM outside a Windows system directory. |
 
+## What's new since the first pre-release
+
+- **USN change journal.** Rename, move and delete history from `$Extend\$UsnJrnl:$J` joins the
+  timeline, one row per operation, linked to the findings on the same file. Timestomp findings
+  cite the kernel's `BASIC_INFO_CHANGE` record.
+- **`$ATTRIBUTE_LIST` is followed.** Files whose attributes overflow into extension records — many
+  hard links, heavy fragmentation — are reassembled instead of dropped.
+- **Buffered `$MFT` reads.** One physical read per 1024 records instead of one per record.
+- Extension records no longer inflate the deleted-record count.
+
 ## Known gaps
 
-- `$ATTRIBUTE_LIST` extension records are reported as a parse error but not followed
-- No USN journal (`$Extend\$UsnJrnl:$J`), so rename/move history is absent
+- Only the newest 64 MiB of the USN journal is read by default (`--usn-limit`); removable media
+  often has no journal at all
+- A file with several hard links is reported under one name
 - No `$LogFile`, Prefetch, registry, Shellbags or event log parsing
 - No known-good hash suppression
-- Unbuffered reads — roughly one aligned read per record, slow across a full disk
+- Unsigned — see Smart App Control above
 
 ## Status
 
-Tested against a synthetic NTFS image (91 tests, including a full scan driven
-through the desktop interface) and verified on a real 57 GB NTFS volume:
-geometry cross-checked against `fsutil`, fixups clean, both planted deletions
-recovered — one byte-for-byte from its MFT record.
+Tested against a synthetic NTFS image (125 tests, including a full scan driven
+through the desktop interface, a two-extent `$MFT`, a file reassembled through
+`$ATTRIBUTE_LIST`, and a planted USN journal) and verified on a real 57 GB NTFS
+volume: geometry cross-checked against `fsutil`, fixups clean, both planted
+deletions recovered — one byte-for-byte from its MFT record.
 
 What has and has not been proven about the **packaged binaries**:
 
-- `checkup-cli.exe` starts and reaches its argument parser.
-- `checkup.exe` starts and stays running.
-- Neither has completed a full scan *as a packaged exe* — the engine behind them
-  has, both from source and against a real volume.
+- `checkup-cli.exe` completes a full scan of the synthetic image, unprivileged,
+  with output identical in shape to a scan from source.
+- `checkup.exe` starts and stays running; its scan path is the same engine,
+  exercised end to end by the GUI tests from source.
 
-Smart App Control blocks unsigned binaries on the build machine, which limited
-what could be exercised there. Treat this as a pre-release.
+Real-volume checks for this build are scripted in `scripts/verify_volume.ps1`.
 
 ## Authorised use only
 

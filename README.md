@@ -9,17 +9,20 @@ the examiner's machine — that is a structural property, not a policy.
 
 ## Status
 
-This branch (`v2-rebuild`) is a rebuild. The v1 analyzer has been removed and the data contract
-between analyzer and UI has been redefined.
+Version 2 is a rebuild on a versioned data contract between analyzer and UI.
 
 | Component | State |
 |---|---|
-| Case file schema (v1) | Done — [src/types/case.ts](src/types/case.ts) |
-| Web app / report UI | Done, verified in browser |
-| Sample case fixture | Done — `npm run sample` |
-| Analyzer (`checkup.py`) | Done — 91 tests passing |
+| Case file schema (v1) | Done — [src/types/case.ts](src/types/case.ts), JSON Schema generated to [schema/](schema/case.schema.json) |
+| Analyzer (`checkup.py`) | Done — 125 tests passing |
+| `$ATTRIBUTE_LIST` following, buffered `$MFT` reads | Done |
+| USN change journal | Done — rename, move and delete history in the timeline |
+| Web app / report UI | Done — 31 tests, verified in browser |
+| Report export | Done — self-contained HTML report and findings CSV |
+| Recovered content | Done — text or hex view, download of the exact bytes |
+| Contract test | Done — analyzer output validated against the schema in CI |
 | Verified against a real volume | Done — 57 GB NTFS, geometry cross-checked against `fsutil` |
-| Executables | `checkup.exe` (desktop) + `checkup-cli.exe`, built by [analyzer/build.ps1](analyzer/build.ps1) |
+| Executables | `checkup.exe` (desktop) + `checkup-cli.exe`, built by [analyzer/build.ps1](analyzer/build.ps1); the CLI exe completes a full scan |
 
 Load the bundled sample case from the landing page to explore the report without running a scan.
 
@@ -40,8 +43,11 @@ Three bugs surfaced only on real hardware, none in the parsing layer: the stagin
 reclaiming its own deleted MFT records, it was not re-runnable because of the attributes it set, and
 the detectors were burying real findings under NTFS metafiles under `$Extend`.
 
-Still unproven at scale: a volume with a fragmented `$MFT`, `$ATTRIBUTE_LIST` records, hard links,
-reparse points and hundreds of thousands of entries.
+The synthetic image now also has a two-extent `$MFT` and a file reassembled from two extension
+records through `$ATTRIBUTE_LIST`, plus a planted USN journal. On real hardware, the scale case — a
+real `$ATTRIBUTE_LIST`, hard links, reparse points and 100k+ entries — is checked by
+[verify_volume.ps1](scripts/verify_volume.ps1); see [Testing the analyzer against a real
+volume](#testing-the-analyzer-against-a-real-volume).
 
 ## Architecture
 
@@ -75,6 +81,7 @@ analyzer/
 │   ├── bitmap.py         $Bitmap — is a deleted file's space reused?
 │   ├── entries.py        the intermediate file model
 │   ├── findings.py       detectors
+│   ├── usn.py            $UsnJrnl:$J — rename, move and delete history
 │   ├── filetime.py       FILETIME conversion, whole-second detection
 │   ├── progress.py       progress reporting + cancellation
 │   ├── volumes.py        volume enumeration and elevation, via ctypes
@@ -119,7 +126,7 @@ Set up the virtual environment once:
 cd analyzer && python -m venv .venv && .venv/Scripts/python.exe -m pip install -r requirements.txt
 ```
 
-Then run the tests (91 of them, about a second, no volume or privileges needed):
+Then run the tests (125 of them, about a second, no volume or privileges needed):
 
 ```bash
 cd analyzer && .venv/Scripts/python.exe -m pytest -q
@@ -139,12 +146,13 @@ python analyzer/checkup.py E: -o case.json
 ```
 
 Useful flags: `--full` emits every parsed record instead of the triaged subset, `--max-records`
-stops early on a large volume, `--no-hash` skips content hashing, and `--hash-limit` caps how large
-a stream will be read for hashing.
+stops early on a large volume, `--no-hash` skips content hashing, `--hash-limit` caps how large a
+stream will be read for hashing, `--usn-limit` caps how much of the USN journal is read (newest
+first, default 64 MiB), and `--no-usn` skips the journal.
 
 ### Implementation notes
 
-Three details are where a naive MFT parser goes wrong, and each has a test:
+Four details are where a naive MFT parser goes wrong, and each has a test:
 
 - **Fixups.** NTFS overwrites the last two bytes of every sector in a record with an update sequence
   number and stashes the originals in a header array. Skip the fixup pass and you silently read two
@@ -154,13 +162,27 @@ Three details are where a naive MFT parser goes wrong, and each has a test:
 - **The `$MFT` extent map.** Record 0 describes `$MFT` itself. Using its run list, rather than
   assuming the table is contiguous, is what makes the parser work on a real fragmented volume.
 
-Known gaps: `$ATTRIBUTE_LIST` extension records are detected and reported as a scan error but not
-followed, so a heavily fragmented record's attributes may be incomplete. There is no read buffering,
-so throughput is roughly one aligned read per record — fine for a test volume, slow on a full disk.
+- **`$ATTRIBUTE_LIST`.** A file with more attributes than fit in one record — many hard links, a
+  heavily fragmented stream — keeps the rest in extension records. The reader follows the list,
+  refuses an extension record that no longer points back to its base (a reused slot), and joins
+  split `$DATA` segments in VCN order. Unfollowed, such a file loses its name and is silently
+  dropped.
 
-## Planned analyzer scope
+`$MFT` reads go through a 1 MiB chunk cache, so a sequential scan costs one physical read per 1024
+records; the scan log reports records/s and the read count.
 
-The first analyzer release covers the NTFS story end to end, and deliberately nothing else:
+### The USN journal
+
+`$Extend\$UsnJrnl:$J` is the kernel's log of every create, delete, rename and move. The analyzer
+reads its allocated tail (the stream is mostly sparse — released history), parses V2 and V3
+records, and emits one timeline row per CLOSE record, pairing each rename with the name it
+replaced. Rows link to findings on the same file, and a timestomp finding cites the journal's
+`BASIC_INFO_CHANGE` — the kernel's record of when `SetFileTime` actually ran. Removable media often
+has no journal; [stage_evidence.ps1](scripts/stage_evidence.ps1) creates one.
+
+## Analyzer scope
+
+The analyzer covers the NTFS story end to end, and deliberately nothing else:
 
 - **Raw volume access** — opens `\\.\X:` directly, bypassing the Windows file APIs and the locks
   they impose on `$MFT`, registry hives and event logs
@@ -172,11 +194,10 @@ The first analyzer release covers the NTFS story end to end, and deliberately no
   `$FILE_NAME` timestamps are only written by the kernel on create, rename and move. `$SI` preceding
   `$FN` cannot happen through normal activity. Zeroed sub-second precision is a second tell
 - **Alternate Data Stream detection** — named `$DATA` attributes, invisible to Explorer and `dir`
-- **USN journal reconstruction** (stretch) — rename, move and delete history from
-  `$Extend\$UsnJrnl:$J`
+- **USN journal reconstruction** — rename, move and delete history from `$Extend\$UsnJrnl:$J`
 
-Explicitly out of scope for now: `$LogFile` parsing, NSRL hash triage, YARA scanning, and the
-Prefetch / registry / shellbag / EVTX artifact set.
+Explicitly out of scope: `$LogFile` parsing, NSRL hash triage, YARA scanning, code signing, and
+the Prefetch / registry / shellbag / EVTX artifact set.
 
 Every finding carries the raw values it was derived from, and the detector that fired, so a
 conclusion can be audited rather than taken on trust.
@@ -196,9 +217,16 @@ Other scripts:
 | Script | Purpose |
 |---|---|
 | `npm run sample` | Regenerate `public/samples/sample-case.json` |
+| `npm run schema` | Regenerate `schema/case.schema.json` from `src/types/case.ts` |
 | `npm run typecheck` | `tsc` across app and node configs |
 | `npm run lint` | ESLint |
+| `npm test` | Vitest: utilities, loader, report export, and the analyzer contract test |
 | `npm run build` | Production build to `dist/` |
+
+The contract test ([tests/contract.test.ts](tests/contract.test.ts)) validates the bundled sample
+and the analyzer's real output on the synthetic image against the generated schema, with unknown
+fields disallowed, and fails if the schema is stale. It needs Python on `PATH` (or `PYTHON` set);
+without it the analyzer half is skipped locally and fails in CI.
 
 ### The sample case
 
@@ -212,8 +240,19 @@ is the reference output the analyzer must reproduce.
 
 ### Testing the analyzer against a real volume
 
-Don't scan `C:`. Format a USB stick as NTFS (or create and attach a VHD with `diskpart`), then plant
-known artifacts so results can be checked against ground truth:
+Don't scan `C:`. Format a USB stick as NTFS (or create and attach a VHD with `diskpart`), then,
+from an elevated PowerShell:
+
+```powershell
+.\scripts\verify_volume.ps1 -Drive E:                     # stage, scan, check
+.\scripts\verify_volume.ps1 -Drive E: -BulkFiles 100000   # plus the scale load
+```
+
+It creates the USN journal, plants the artifacts, scans, and checks geometry against `fsutil` and
+every planted artifact, printing PASS/FAIL lines. With `-BulkFiles` it first adds that many files,
+a file with 40 hard links (which forces a real `$ATTRIBUTE_LIST`), a junction and a symlink.
+
+To plant artifacts by hand instead:
 
 ```powershell
 (Get-Item .\report.docx).CreationTime = '2019-03-12 08:00:00'
@@ -234,19 +273,29 @@ src/
 │   ├── ui/primitives    Panel, SeverityMark, Field, Segmented, Notice
 │   ├── common/          FileUpload
 │   └── results/         CaseList, Overview, Findings,
-│                        Timeline, Records, Stats
-├── context/             AppContext (cases + storage), ThemeContext
+│                        Timeline, Records, RecoveredContent, Stats
+├── context/             AppContext (cases), ThemeContext, hooks
 ├── pages/               LandingPage (workspace), ResultsPage, AboutPage (method)
 ├── types/
 │   ├── case.ts          versioned wire contract (shared with the analyzer)
 │   └── app.ts           UI-only types
 └── utils/
     ├── caseLoader.ts    parse + version + structure validation
+    ├── caseStore.ts     IndexedDB persistence
+    ├── report.ts        HTML report and findings CSV export
+    ├── bytes.ts         recovered content: text detection, hex dump, download
     └── formatters.ts    UTC formatting, severity styling
+schema/case.schema.json  generated from case.ts; the analyzer is validated against it
+tests/contract.test.ts
 scripts/
 ├── make-sample-case.mjs
-└── stage_evidence.ps1
+├── stage_evidence.ps1
+├── verify_volume.ps1    stage + scan + check a real test volume
+└── verify_case.py
 ```
+
+Cases are kept in IndexedDB in the browser profile, so a large `--full` case persists across
+reloads. Nothing is uploaded.
 
 ### Interface conventions
 
@@ -270,7 +319,8 @@ The analyzer ships via **GitHub Releases**, not from `public/`. A PyInstaller bi
 constantly during development; committing it would add a copy to git history every iteration.
 
 Build it with [analyzer/build.ps1](analyzer/build.ps1), which runs the tests first and prints the
-SHA-256 to publish alongside the release. Current build: **7.1 MB**.
+SHA-256 to publish alongside the release. Current build: **10.2 MB** (`checkup.exe`, which bundles
+Tcl/Tk) and **7.2 MB** (`checkup-cli.exe`).
 
 ### Smart App Control will block the unsigned exe
 
@@ -310,9 +360,11 @@ as a script instead.
 ## Deployment
 
 Pushes to `main` build and deploy to GitHub Pages via
-[.github/workflows/deploy.yml](.github/workflows/deploy.yml). The workflow typechecks, builds with
-`VITE_BASE_URL=/ForensicaLite/`, and copies `index.html` to `404.html` — GitHub Pages has no rewrite
-rules, so without that fallback a direct hit on `/results` would 404.
+[.github/workflows/deploy.yml](.github/workflows/deploy.yml). The workflow runs the analyzer tests
+on Windows, then typechecks, lints and runs the web tests (including the contract test), builds
+with `VITE_BASE_URL=/ForensicaLite/`, and copies `index.html` to `404.html` — GitHub Pages has no
+rewrite rules, so without that fallback a direct hit on `/results` would 404. A failure at any step
+blocks the deploy.
 
 ## Legal
 
