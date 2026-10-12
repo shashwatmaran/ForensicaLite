@@ -247,12 +247,16 @@ Write-Host '    deleted (non)  Media\screen-capture.mp4     (5 MB, expect partia
 # --- Summary ----------------------------------------------------------------
 
 Write-Host ''
-Write-Host '[*] staged. Expected findings:' -ForegroundColor Green
-Write-Host '      timestomp                2  (si-fn-created-mismatch, si-subsecond-zeroed)'
-Write-Host '      alternate-data-stream    1'
-Write-Host '      deleted-recoverable      2  (one full, one partial)'
-Write-Host '      hidden-system-file       1'
-Write-Host '      impossible-timestamp     1'
+# Both backdated files go through SetFileTime, so each raises the full set of
+# timestamp rules - verified against a real scan, not estimated.
+Write-Host '[*] staged. Expected findings (12):' -ForegroundColor Green
+Write-Host '      timestomp                6  svchost.exe and install.log, 3 rules each:'
+Write-Host '                                  si-fn-created-mismatch, si-fn-modified-mismatch,'
+Write-Host '                                  si-subsecond-zeroed'
+Write-Host '      impossible-timestamp     2  both files predate the volume'
+Write-Host '      deleted-recoverable      2  handover-credentials.txt (full), screen-capture.mp4 (partial)'
+Write-Host '      alternate-data-stream    1  notes.txt:payload'
+Write-Host '      hidden-system-file       1  svchost.exe'
 Write-Host ''
 Write-Host '    Expected in the timeline (source USN), if the journal was created:' -ForegroundColor Green
 Write-Host '      moved     Docs\plan-final.txt   (from Media\plan.txt)'

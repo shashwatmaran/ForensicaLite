@@ -22,6 +22,7 @@ Version 2 is a rebuild on a versioned data contract between analyzer and UI.
 | Recovered content | Done — text or hex view, download of the exact bytes |
 | Contract test | Done — analyzer output validated against the schema in CI |
 | Verified against a real volume | Done — 57 GB NTFS, geometry cross-checked against `fsutil` |
+| Verified at scale | Done — 100,159 records on a 57 GB stick, 19/19 checks, 0 scan errors |
 | Executables | `checkup.exe` (desktop) + `checkup-cli.exe`, built by [analyzer/build.ps1](analyzer/build.ps1); the CLI exe completes a full scan |
 
 Load the bundled sample case from the landing page to explore the report without running a scan.
@@ -44,10 +45,14 @@ reclaiming its own deleted MFT records, it was not re-runnable because of the at
 the detectors were burying real findings under NTFS metafiles under `$Extend`.
 
 The synthetic image now also has a two-extent `$MFT` and a file reassembled from two extension
-records through `$ATTRIBUTE_LIST`, plus a planted USN journal. On real hardware, the scale case — a
-real `$ATTRIBUTE_LIST`, hard links, reparse points and 100k+ entries — is checked by
-[verify_volume.ps1](scripts/verify_volume.ps1); see [Testing the analyzer against a real
-volume](#testing-the-analyzer-against-a-real-volume).
+records through `$ATTRIBUTE_LIST`, plus a planted USN journal.
+
+The scale case was then run on the same stick with
+[verify_volume.ps1](scripts/verify_volume.ps1) `-BulkFiles 100000`: 100,159 MFT records parsed in
+5.7 s (17,517 records/s, 98 physical `$MFT` reads), a file with 40 hard links reassembled through a
+real `$ATTRIBUTE_LIST` with no errors, a junction and a symlink parsed cleanly, and 24 MB of USN
+journal — 300,367 records, 100,196 operations — read including the planted cross-directory move.
+All 19 checks passed with zero scan errors; the whole scan, hashing included, took 49 s.
 
 ## Architecture
 

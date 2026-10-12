@@ -5,11 +5,11 @@ volume directly, off the disk, and a zero-backend web app turns what it finds in
 auditable report — so evidence never has to leave the machine it came from.
 
 **Stack:** Python 3.11+, standard library only · React/TypeScript static web app
-**Status:** v1 scope complete; engine + UI verified on real hardware
+**Status:** v2.0.0 — v1 scope complete, verified on real hardware at 100k-file scale
 
 | | | | |
 |---|---|---|---|
-| **156** tests passing | **57 GB** real volume verified | **7** detectors, 10 rules | **2** binaries, one engine |
+| **156** tests passing | **100k** files verified on a real 57 GB drive | **7** detectors, 10 rules | **17.5k** records/s |
 
 **Agenda:** 01 Architecture · 02 Functionalities · 03 Demo · 04 Implementation · 05 Where it stands
 
@@ -104,7 +104,10 @@ has a predicted answer before the scan even starts.
    load the JSON straight off disk into the browser.
 5. **Walk the Findings panel against the answer key** — narrate each expected finding
    before it appears, which reads as command of the material, not a lucky demo.
-   Expected: `2 timestomp · 1 ADS · 2 deleted-recoverable · 1 hidden-system · 1 impossible-timestamp`
+   Expected, 12 findings across 5 files: `6 timestomp · 2 impossible-timestamp ·
+   2 deleted-recoverable · 1 ADS · 1 hidden-system`. Both backdated files (`svchost.exe`,
+   `install.log`) trip all three timestamp rules and predate the volume — verified on
+   the real stick, not estimated.
 6. **Open the Timeline, filter to USN** — the move from `Media\plan.txt` to
    `Docs\plan-final.txt` and both deletions, none of which the $MFT alone can show. Then
    open the timestomp finding: the journal's `BASIC_INFO_CHANGE` says when the forgery
@@ -178,10 +181,13 @@ The v1 scope is built and tested. Named precisely, not glossed over.
 - Desktop GUI + CLI, cancellable, atomic case-file write
 - Versioned schema with a contract test in CI; static report UI with HTML/CSV export
 
-**Verification still to run on hardware**
+**Verified at scale on real hardware**
 
-- **Scale** — 100k+ files, a real $ATTRIBUTE_LIST from 40 hard links, reparse points:
-  scripted end to end in `scripts/verify_volume.ps1 -BulkFiles 100000`
+- 100,159 records on a 57 GB USB stick, parsed at 17,517 records/s with 98 disk reads
+- A real `$ATTRIBUTE_LIST` (40 hard links) reassembled, reparse points parsed cleanly
+- 300,367 USN journal records read; the planted move and deletions all recovered
+- 19 of 19 ground-truth checks passed, zero scan errors — one command,
+  `scripts/verify_volume.ps1 -Drive E: -BulkFiles 100000`
 
 **Deliberately out of scope**
 

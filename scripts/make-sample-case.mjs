@@ -659,7 +659,7 @@ for (const finding of findings) {
 
 const caseFile = {
   schemaVersion: 1,
-  generator: { tool: 'checkup', version: '2.0.0-dev', builtAt: null },
+  generator: { tool: 'checkup', version: '2.0.0', builtAt: null },
   volume: {
     label: 'CASE-TEST',
     driveLetter: 'E:',

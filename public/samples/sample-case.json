@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "generator": {
     "tool": "checkup",
-    "version": "2.0.0-dev",
+    "version": "2.0.0",
     "builtAt": null
   },
   "volume": {

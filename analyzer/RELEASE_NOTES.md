@@ -1,4 +1,4 @@
-# checkup v2.0.0-dev
+# checkup v2.0.0
 
 Raw NTFS forensic analyzer. Parses `$MFT` directly from a volume opened for
 sector-level access and writes a schema-v1 JSON case file for the
@@ -18,11 +18,11 @@ black window when the GUI opens.
 ## Verify the download
 
 ```
-checkup.exe      10,660,457 bytes
-  sha256         7ad5032c117f54d47faeafa3a69d63ee1f89547a8e02a496b16b9f54e75d250f
+checkup.exe      10,661,786 bytes
+  sha256         55f79ff52ff20ab306628a8297cef6a5ac9bb14de4ad465e36ef35ccd910ac5f
 
-checkup-cli.exe   7,520,489 bytes
-  sha256         59c45675932d45a1f117e470e39b98d06aca77a57dbcdfdd9301388c53f79b23
+checkup-cli.exe   7,521,590 bytes
+  sha256         8b144191529076319a41aed182c7c3c7ecbe720c73a76ff286e404cb6e5be4e9
 
 Built            Python 3.13.15, PyInstaller 6.22.3
 ```
@@ -145,7 +145,11 @@ What has and has not been proven about the **packaged binaries**:
 - `checkup.exe` starts and stays running; its scan path is the same engine,
   exercised end to end by the GUI tests from source.
 
-Real-volume checks for this build are scripted in `scripts/verify_volume.ps1`.
+Verified at scale on a real 57 GB NTFS stick with `scripts/verify_volume.ps1
+-BulkFiles 100000`: 100,159 records parsed in 5.7 s (17,517 records/s, 98
+physical `$MFT` reads), a real `$ATTRIBUTE_LIST` from 40 hard links reassembled
+without error, reparse points parsed, 300,367 USN records read, and all 19
+ground-truth checks passed with zero scan errors.
 
 ## Authorised use only
 

@@ -6,7 +6,7 @@ into an investigative report. Built to answer one question — what does the dis
 actually contain, regardless of what the OS says.
 
 **Stack:** Python 3.11+ analyzer, standard library only · React/TypeScript static web app
-**Status:** v1 scope complete and verified on a real volume; scale run scripted, pending hardware
+**Status:** v2.0.0 — v1 scope complete, verified on a real volume at 100k-file scale
 
 ---
 
@@ -104,13 +104,14 @@ raw values it was computed from.
 
 ## 5. Where it actually stands
 
-The v1 scope is built and tested. One verification run on real hardware remains. Say
-that out loud in the review — naming it precisely reads better than glossing over it.
+The v1 scope is built, tested, and verified on real hardware at scale. What is left out
+is left out on purpose — say so in the review, precisely.
 
 **By the numbers**
 
 - **156** automated tests (125 analyzer, 31 web), seconds to run, no disk needed
 - **57 GB** real NTFS volume, verified against `fsutil`
+- **100k** files on that volume: 17,517 records/s, 19/19 ground-truth checks, 0 errors
 - **7** detectors, 10 rule ids, each independently tested
 - **2** binaries — desktop GUI + scriptable CLI, the CLI exe proven on a full scan
 
@@ -128,11 +129,11 @@ that out loud in the review — naming it precisely reads better than glossing o
 - Tested on a synthetic image (including a fragmented $MFT, an `$ATTRIBUTE_LIST` file and
   a planted journal) *and* a real 57 GB drive
 
-**Still to run on hardware**
+**Verified at scale**
 
-- **Scale** — 100k+ files, 40 hard links forcing a real `$ATTRIBUTE_LIST`, reparse
-  points: one command, `scripts/verify_volume.ps1 -Drive E: -BulkFiles 100000`, prints
-  PASS/FAIL per check
+- 100,159 records, a real `$ATTRIBUTE_LIST` from 40 hard links, a junction and a
+  symlink, 300k USN records — all from one command,
+  `scripts/verify_volume.ps1 -Drive E: -BulkFiles 100000`, 19 of 19 checks passing
 
 **Out of scope by design**
 
