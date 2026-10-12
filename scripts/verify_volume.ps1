@@ -66,7 +66,8 @@ if ($BulkFiles -gt 0) {
     $large = [byte[]]::new(8192)                            # non-resident
     $timer = [Diagnostics.Stopwatch]::StartNew()
     for ($i = 0; $i -lt $BulkFiles; $i++) {
-        $dir = Join-Path $bulk ('{0:d4}' -f [math]::Floor($i / 1000))
+        # [math]::Floor returns a double, which the integer format d4 rejects.
+        $dir = Join-Path $bulk ('{0:d4}' -f [int][math]::Floor($i / 1000))
         if ($i % 1000 -eq 0) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
         $bytes = if ($i % 2) { $large } else { $small }
         [IO.File]::WriteAllBytes((Join-Path $dir "f$i.bin"), $bytes)
