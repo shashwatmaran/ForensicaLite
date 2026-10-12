@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import clsx from 'clsx';
 import { Finding, Severity } from '../../types';
-import { SEVERITY_ORDER, humanizeSlug } from '../../utils/formatters';
+import { SEVERITY_ORDER, humanizeSlug, severityBg } from '../../utils/formatters';
 import {
   EmptyState,
   Mono,
@@ -11,7 +11,6 @@ import {
   Segmented,
   SegmentedOption,
   SeverityMark,
-  severityBg,
 } from '../ui/primitives';
 
 /**

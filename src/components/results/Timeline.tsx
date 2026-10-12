@@ -13,7 +13,7 @@ import { Bar } from 'react-chartjs-2';
 import clsx from 'clsx';
 import { Collection, HistogramBucket, TimelineEntry, TimelineSource } from '../../types';
 import { formatUtc, humanizeSlug } from '../../utils/formatters';
-import { useTheme } from '../../context/ThemeContext';
+import { useTheme } from '../../context/hooks';
 import {
   EmptyState,
   Mono,

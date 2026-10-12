@@ -1,18 +1,9 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { AppContextType, CaseFile, SCHEMA_VERSION } from '../types';
+import React, { useState, useEffect, useCallback, ReactNode } from 'react';
+import { CaseFile, SCHEMA_VERSION } from '../types';
+import { AppContext } from './hooks';
 
 /** Key is schema-versioned: a schema bump must not resurrect incompatible cases. */
 const STORAGE_KEY = `forensica-cases-v${SCHEMA_VERSION}`;
-
-const AppContext = createContext<AppContextType | undefined>(undefined);
-
-export const useAppContext = () => {
-  const context = useContext(AppContext);
-  if (!context) {
-    throw new Error('useAppContext must be used within an AppProvider');
-  }
-  return context;
-};
 
 interface AppProviderProps {
   children: ReactNode;

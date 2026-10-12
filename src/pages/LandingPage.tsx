@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import AppShell from '../components/shell/AppShell';
 import FileUpload from '../components/common/FileUpload';
 import CaseList from '../components/results/CaseList';
-import { useAppContext } from '../context/AppContext';
+import { useAppContext } from '../context/hooks';
 import { CaseFile } from '../types';
 import { Mono, Notice, Panel, PanelHeader } from '../components/ui/primitives';
 

@@ -9,6 +9,7 @@
 import React from 'react';
 import clsx from 'clsx';
 import { Severity } from '../../types';
+import { severityBg, severityText } from '../../utils/formatters';
 
 // ---------------------------------------------------------------------------
 // Surfaces
@@ -88,25 +89,6 @@ export const Field: React.FC<{
 // ---------------------------------------------------------------------------
 // Severity
 // ---------------------------------------------------------------------------
-
-const SEV_TEXT: Record<Severity, string> = {
-  critical: 'text-sev-critical',
-  high: 'text-sev-high',
-  medium: 'text-sev-medium',
-  low: 'text-sev-low',
-  info: 'text-sev-info',
-};
-
-const SEV_BG: Record<Severity, string> = {
-  critical: 'bg-sev-critical',
-  high: 'bg-sev-high',
-  medium: 'bg-sev-medium',
-  low: 'bg-sev-low',
-  info: 'bg-sev-info',
-};
-
-export const severityText = (severity: Severity) => SEV_TEXT[severity] ?? SEV_TEXT.info;
-export const severityBg = (severity: Severity) => SEV_BG[severity] ?? SEV_BG.info;
 
 /**
  * The severity marker: a 2px vertical bar plus an abbreviated label.

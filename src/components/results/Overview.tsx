@@ -1,8 +1,14 @@
 import React from 'react';
 import clsx from 'clsx';
 import { CaseFile } from '../../types';
-import { formatDuration, formatFileSize, formatNumber, formatUtc } from '../../utils/formatters';
-import { Field, Panel, PanelHeader, severityText } from '../ui/primitives';
+import {
+  formatDuration,
+  formatFileSize,
+  formatNumber,
+  formatUtc,
+  severityText,
+} from '../../utils/formatters';
+import { Field, Panel, PanelHeader } from '../ui/primitives';
 
 /**
  * The case at a glance.

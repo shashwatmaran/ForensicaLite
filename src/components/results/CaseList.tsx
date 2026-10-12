@@ -1,8 +1,14 @@
 import React from 'react';
 import clsx from 'clsx';
 import { CaseFile } from '../../types';
-import { SEVERITY_ORDER, formatFileSize, formatNumber, formatUtc } from '../../utils/formatters';
-import { Button, EmptyState, Mono, Panel, PanelHeader, severityBg } from '../ui/primitives';
+import {
+  SEVERITY_ORDER,
+  formatFileSize,
+  formatNumber,
+  formatUtc,
+  severityBg,
+} from '../../utils/formatters';
+import { Button, EmptyState, Mono, Panel, PanelHeader } from '../ui/primitives';
 
 /**
  * Open cases, as rows rather than cards.

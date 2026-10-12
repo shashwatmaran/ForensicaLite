@@ -6,7 +6,7 @@ import Findings from '../components/results/Findings';
 import Timeline from '../components/results/Timeline';
 import Records from '../components/results/Records';
 import Stats from '../components/results/Stats';
-import { useAppContext } from '../context/AppContext';
+import { useAppContext } from '../context/hooks';
 import { Mono, Notice } from '../components/ui/primitives';
 import { formatFileSize, formatNumber } from '../utils/formatters';
 

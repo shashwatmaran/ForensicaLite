@@ -47,45 +47,26 @@ export const formatDuration = (seconds: number): string => {
 /** Most severe first — the order findings should always be presented in. */
 export const SEVERITY_ORDER: Severity[] = ['critical', 'high', 'medium', 'low', 'info'];
 
-interface SeverityStyle {
-  /** Text colour for icons and headings. */
-  text: string;
-  /** Pill/badge background. */
-  badge: string;
-  /** Card background plus left accent border. */
-  card: string;
-}
-
-const SEVERITY_STYLES: Record<Severity, SeverityStyle> = {
-  critical: {
-    text: 'text-red-600 dark:text-red-400',
-    badge: 'bg-red-600 text-white',
-    card: 'bg-red-50 dark:bg-red-950/20 border-l-red-600',
-  },
-  high: {
-    text: 'text-orange-600 dark:text-orange-400',
-    badge: 'bg-orange-500 text-white',
-    card: 'bg-orange-50 dark:bg-orange-950/20 border-l-orange-500',
-  },
-  medium: {
-    text: 'text-amber-600 dark:text-amber-400',
-    badge: 'bg-amber-500 text-white',
-    card: 'bg-amber-50 dark:bg-amber-950/20 border-l-amber-500',
-  },
-  low: {
-    text: 'text-sky-600 dark:text-sky-400',
-    badge: 'bg-sky-500 text-white',
-    card: 'bg-sky-50 dark:bg-sky-950/20 border-l-sky-500',
-  },
-  info: {
-    text: 'text-slate-600 dark:text-slate-400',
-    badge: 'bg-slate-500 text-white',
-    card: 'bg-slate-50 dark:bg-slate-800/40 border-l-slate-500',
-  },
+// Colour is reserved for severity, so these are the only coloured classes in
+// the interface. The `sev-*` tokens live in tailwind.config.js.
+const SEV_TEXT: Record<Severity, string> = {
+  critical: 'text-sev-critical',
+  high: 'text-sev-high',
+  medium: 'text-sev-medium',
+  low: 'text-sev-low',
+  info: 'text-sev-info',
 };
 
-export const getSeverityStyle = (severity: Severity): SeverityStyle =>
-  SEVERITY_STYLES[severity] ?? SEVERITY_STYLES.info;
+const SEV_BG: Record<Severity, string> = {
+  critical: 'bg-sev-critical',
+  high: 'bg-sev-high',
+  medium: 'bg-sev-medium',
+  low: 'bg-sev-low',
+  info: 'bg-sev-info',
+};
+
+export const severityText = (severity: Severity) => SEV_TEXT[severity] ?? SEV_TEXT.info;
+export const severityBg = (severity: Severity) => SEV_BG[severity] ?? SEV_BG.info;
 
 const RECOVERY_LABELS: Record<RecoveryConfidence, string> = {
   full: 'Fully recoverable',
