@@ -21,7 +21,7 @@ export interface AppContextType {
   selectCase: (caseId: string) => void;
   /**
    * Set when the last attempt to persist cases failed — almost always the
-   * localStorage quota being exceeded by a large case file. Surfaced in the UI
+   * browser storage being full or disabled. Surfaced in the UI
    * rather than swallowed, so a case that did not save says so.
    */
   storageError: string | null;

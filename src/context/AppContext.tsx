@@ -1,71 +1,48 @@
 import React, { useState, useEffect, useCallback, ReactNode } from 'react';
-import { CaseFile, SCHEMA_VERSION } from '../types';
+import { CaseFile } from '../types';
+import { deleteCase, loadCases, saveCase } from '../utils/caseStore';
 import { AppContext } from './hooks';
-
-/** Key is schema-versioned: a schema bump must not resurrect incompatible cases. */
-const STORAGE_KEY = `forensica-cases-v${SCHEMA_VERSION}`;
 
 interface AppProviderProps {
   children: ReactNode;
 }
 
-/** Drop anything that is not a case file of the schema version we understand. */
-const hydrate = (): CaseFile[] => {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) return [];
-
-    const parsed: unknown = JSON.parse(stored);
-    if (!Array.isArray(parsed)) return [];
-
-    return parsed.filter(
-      (entry): entry is CaseFile =>
-        typeof entry === 'object' &&
-        entry !== null &&
-        (entry as CaseFile).schemaVersion === SCHEMA_VERSION &&
-        typeof (entry as CaseFile).scan?.caseId === 'string'
-    );
-  } catch {
-    return [];
-  }
-};
+const describe = (error: unknown) => (error instanceof Error ? ` [${error.message}]` : '');
 
 export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const [caseData, setCaseData] = useState<CaseFile | null>(null);
   const [currentCaseId, setCurrentCaseId] = useState<string | null>(null);
-  const [cases, setCases] = useState<CaseFile[]>(hydrate);
+  const [cases, setCases] = useState<CaseFile[]>([]);
   const [storageError, setStorageError] = useState<string | null>(null);
 
-  // Persist on change. A failure here is reported rather than swallowed: a
-  // large case file can exceed the localStorage quota, and a case that
-  // silently failed to save would reappear as missing after a refresh.
+  // Saved cases load asynchronously. Anything opened before they arrive wins
+  // over a stored copy with the same id.
   useEffect(() => {
-    if (cases.length === 0) {
-      try {
-        localStorage.removeItem(STORAGE_KEY);
-        setStorageError(null);
-      } catch {
-        // Nothing useful to report when clearing fails.
-      }
-      return;
-    }
+    let cancelled = false;
+    loadCases()
+      .then((stored) => {
+        if (cancelled) return;
+        setCases((current) => {
+          const open = new Set(current.map((c) => c.scan.caseId));
+          return [...current, ...stored.filter((c) => !open.has(c.scan.caseId))];
+        });
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setStorageError(
+            'Saved cases could not be loaded from browser storage. Cases you open now will ' +
+              'work, but may not persist.' +
+              describe(error)
+          );
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-    try {
-      const serialized = JSON.stringify(cases);
-      localStorage.setItem(STORAGE_KEY, serialized);
-      setStorageError(null);
-    } catch (error) {
-      const approxMb = (JSON.stringify(cases).length / (1024 * 1024)).toFixed(1);
-      setStorageError(
-        `Could not save ${cases.length} case${cases.length === 1 ? '' : 's'} to browser storage ` +
-          `(~${approxMb} MB, over this browser's limit). The case is still open now, but it will ` +
-          `be gone if you reload. Re-run the analyzer against a smaller volume, or without --full, ` +
-          `to produce a smaller case file.` +
-          (error instanceof Error ? ` [${error.name}]` : '')
-      );
-    }
-  }, [cases]);
-
+  // Writes are per case. A failure is reported rather than swallowed: a case
+  // that silently failed to save would reappear as missing after a reload.
   const addCase = useCallback((newCase: CaseFile) => {
     setCases((prev) => {
       const existingIndex = prev.findIndex((c) => c.scan.caseId === newCase.scan.caseId);
@@ -83,6 +60,17 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     // report route straight back to the workspace.
     setCurrentCaseId(newCase.scan.caseId);
     setCaseData(newCase);
+
+    saveCase(newCase)
+      .then(() => setStorageError(null))
+      .catch((error) =>
+        setStorageError(
+          `Case ${newCase.scan.caseId} is open but could not be saved to browser storage, so it ` +
+            'will be gone after a reload. Browser storage may be full or disabled (private ' +
+            'windows often restrict it).' +
+            describe(error)
+        )
+      );
   }, []);
 
   const removeCase = useCallback(
@@ -92,6 +80,13 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         setCurrentCaseId(null);
         setCaseData(null);
       }
+      deleteCase(caseId).catch((error) =>
+        setStorageError(
+          `Case ${caseId} was closed but could not be removed from browser storage, so it may ` +
+            'reappear after a reload.' +
+            describe(error)
+        )
+      );
     },
     [currentCaseId]
   );
