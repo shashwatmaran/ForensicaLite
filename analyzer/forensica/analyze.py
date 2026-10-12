@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from . import SCHEMA_VERSION, __version__, bitmap as bitmap_module, boot as boot_module
+from . import usn as usn_module
 from .entries import FileEntry, StreamInfo
 from .filetime import filetime_to_iso, now_iso, to_timestamp
 from .findings import is_filesystem_metadata, run_detectors
@@ -86,6 +87,13 @@ class ScanOptions:
     hash_limit: int = 16 * 1024 * 1024
     #: Skip content hashing entirely.
     no_hash: bool = False
+    #: Most recent bytes of the USN journal to read. The allocated tail of $J
+    #: can run to gigabytes on a busy system volume.
+    usn_limit: int = 64 * 1024 * 1024
+    #: Skip the USN journal entirely.
+    no_usn: bool = False
+    #: Ceiling on USN rows in the emitted timeline; the newest are kept.
+    max_usn_rows: int = 20_000
     quiet: bool = False
 
 
@@ -671,6 +679,164 @@ def _select_emitted(
 
 
 # ---------------------------------------------------------------------------
+# USN journal
+# ---------------------------------------------------------------------------
+
+#: $Extend is always record 11; the journal is its child $UsnJrnl.
+RECORD_EXTEND = 11
+
+
+def _same_file(entry: Optional[FileEntry], sequence: int) -> bool:
+    """
+    Whether an MFT entry is the file a journal reference names.
+
+    NTFS bumps a record's sequence number when the record is freed, so a
+    deleted file's record carries one more than the references written while
+    it was alive.
+    """
+    if entry is None:
+        return False
+    if entry.sequence_number == sequence:
+        return True
+    return entry.deleted and entry.sequence_number == (sequence + 1) & 0xFFFF
+
+
+def _read_usn_timeline(
+    entries: Dict[int, FileEntry],
+    volume: RawVolume,
+    bytes_per_cluster: int,
+    options: ScanOptions,
+    context: ScanContext,
+    log: Any,
+) -> Tuple[List[Dict[str, Any]], str, Dict[int, List[int]]]:
+    """
+    Returns every USN timeline row, a sentence for the inclusion policy, and
+    the BASIC_INFO_CHANGE times logged against each live record.
+    """
+    journal = next(
+        (
+            entry
+            for entry in entries.values()
+            if entry.name == "$UsnJrnl" and entry.parent_record == RECORD_EXTEND
+        ),
+        None,
+    )
+    stream = None
+    if journal is not None:
+        stream = next(
+            (a for a in journal.raw_data_attributes if a.name == "$J" and a.non_resident), None
+        )
+
+    if stream is None:
+        log("[*] no USN journal on this volume")
+        return [], (
+            "The volume has no USN change journal ($Extend\\$UsnJrnl:$J), so the timeline "
+            "is built from $SI and $FN only. Removable media often has the journal disabled."
+        ), {}
+
+    try:
+        journal_read = usn_module.read_journal(volume, bytes_per_cluster, stream, options.usn_limit)
+    except VolumeReadError as error:
+        context.note_error("usn", journal.record_number, f"journal read failed: {error}")
+        return [], "The USN journal could not be read; see the scan errors.", {}
+
+    records, malformed = usn_module.parse_records(journal_read.data)
+    if malformed:
+        context.note_error(
+            "usn",
+            journal.record_number,
+            f"{malformed} malformed USN record{'' if malformed == 1 else 's'} skipped",
+        )
+
+    def directory_path(record: int, sequence: int) -> Optional[str]:
+        entry = entries.get(record)
+        if not _same_file(entry, sequence) or not entry.is_directory:
+            return None
+        return entry.path
+
+    def findings_for(record: int, sequence: int) -> List[str]:
+        entry = entries.get(record)
+        return list(entry.finding_ids) if _same_file(entry, sequence) else []
+
+    rows = usn_module.build_timeline_rows(records, directory_path, findings_for)
+
+    metadata_changes: Dict[int, List[int]] = {}
+    for record in records:
+        if record.reason & usn_module.BASIC_INFO_CHANGE and record.reason & usn_module.CLOSE:
+            if _same_file(entries.get(record.file_record), record.file_sequence):
+                metadata_changes.setdefault(record.file_record, []).append(record.timestamp)
+
+    log(
+        f"[*] USN journal: {len(journal_read.data):,} bytes read, {len(records):,} records, "
+        f"{len(rows):,} operations"
+    )
+
+    policy = f"USN journal operations ({len(records):,} records read from $J)."
+    if journal_read.skipped_bytes:
+        policy += (
+            f" Only the newest {len(journal_read.data):,} bytes were read; "
+            f"{journal_read.skipped_bytes:,} older bytes were left unread (--usn-limit)."
+        )
+    if journal_read.sparse_bytes:
+        policy += (
+            f" NTFS had already released {journal_read.sparse_bytes:,} bytes of older history."
+        )
+    return rows, policy, metadata_changes
+
+
+def _corroborate_timestomps(
+    findings: List[Dict[str, Any]], metadata_changes: Dict[int, List[int]]
+) -> None:
+    """
+    Attach the journal's record of the metadata change to timestomp findings.
+
+    SetFileTime — the call every timestomping tool makes — is logged by the
+    kernel as BASIC_INFO_CHANGE, with the real time it happened. That is
+    independent evidence of the forgery, and usually the answer to when.
+    """
+    for finding in findings:
+        if finding["type"] != "timestomp":
+            continue
+        for raw in metadata_changes.get(finding["recordNumber"], []):
+            finding["evidence"].append(
+                {
+                    "label": "USN BASIC_INFO_CHANGE",
+                    "value": filetime_to_iso(raw),
+                    "note": "kernel-logged timestamp change; when SetFileTime was most likely called",
+                }
+            )
+
+
+def _select_usn_rows(
+    rows: List[Dict[str, Any]], emitted: List[FileEntry], options: ScanOptions
+) -> Tuple[List[Dict[str, Any]], str]:
+    """
+    Pick the USN rows worth emitting.
+
+    In triaged mode: rows about an emitted record, plus every delete, rename
+    and move — those are the history the $MFT itself may no longer hold.
+    """
+    if options.full:
+        selected = rows
+        policy = ""
+    else:
+        emitted_numbers = {entry.record_number for entry in emitted}
+        selected = [
+            row
+            for row in rows
+            if row["recordNumber"] in emitted_numbers
+            or row["action"] in ("deleted", "renamed", "moved")
+        ]
+        policy = " In triaged mode, rows for emitted records plus every delete, rename and move."
+
+    if len(selected) > options.max_usn_rows:
+        selected = sorted(selected, key=lambda row: row["timestamp"])[-options.max_usn_rows :]
+        policy += f" Capped at the newest {options.max_usn_rows:,} rows."
+
+    return selected, policy
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
@@ -838,6 +1004,17 @@ def run_scan(
         )
         log(f"[*] {len(findings)} findings raised")
 
+        # After the detectors, so journal rows can link to the findings on
+        # their records, and timestomp findings can cite the journal.
+        usn_rows: List[Dict[str, Any]] = []
+        usn_policy = "The USN journal was not read (--no-usn)."
+        if not options.no_usn:
+            reporter.stage("usn", "Reading the USN change journal")
+            usn_rows, usn_policy, metadata_changes = _read_usn_timeline(
+                entries, volume, boot.bytes_per_cluster, options, context, log
+            )
+            _corroborate_timestomps(findings, metadata_changes)
+
         reporter.stage("report", "Building case file")
         statistics = _build_statistics(user_entries, findings)
         emitted, inclusion_policy = _select_emitted(user_entries, options)
@@ -850,8 +1027,11 @@ def run_scan(
                 "were excluded as filesystem plumbing."
             )
 
-        timeline = _build_timeline(emitted)
-        total_timeline = _count_timeline_entries(user_entries)
+        emitted_usn, usn_selection = _select_usn_rows(usn_rows, emitted, options)
+        timeline = sorted(
+            _build_timeline(emitted) + emitted_usn, key=lambda item: item["timestamp"]
+        )
+        total_timeline = _count_timeline_entries(user_entries) + len(usn_rows)
 
         case_id = options.case_id or _default_case_id(prefix)
 
@@ -902,8 +1082,9 @@ def run_scan(
                 "includedCount": len(timeline),
                 "totalCount": total_timeline,
                 "inclusionPolicy": (
-                    "MACB entries from $SI and $FN for every emitted record. USN journal "
-                    "reconstruction is not yet implemented."
+                    "MACB entries from $SI and $FN for every emitted record. "
+                    + usn_policy
+                    + (usn_selection if usn_rows else "")
                 ),
                 "entries": timeline,
             },

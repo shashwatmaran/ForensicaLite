@@ -82,6 +82,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Largest non-resident stream to read and hash, in bytes (default: 16 MiB).",
     )
     parser.add_argument("--no-hash", action="store_true", help="Skip content hashing entirely.")
+    parser.add_argument(
+        "--usn-limit",
+        type=int,
+        default=64 * 1024 * 1024,
+        help="Most recent bytes of the USN journal to read (default: 64 MiB).",
+    )
+    parser.add_argument(
+        "--no-usn", action="store_true", help="Skip the USN change journal entirely."
+    )
     parser.add_argument("-q", "--quiet", action="store_true", help="Suppress progress output.")
     parser.add_argument("--version", action="version", version=f"checkup {__version__}")
     return parser
@@ -114,6 +123,8 @@ def main(argv: list[str] | None = None) -> int:
         max_records=args.max_records,
         hash_limit=args.hash_limit,
         no_hash=args.no_hash,
+        usn_limit=args.usn_limit,
+        no_usn=args.no_usn,
         quiet=args.quiet,
     )
 

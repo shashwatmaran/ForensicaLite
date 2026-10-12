@@ -185,13 +185,11 @@ const Timeline: React.FC<{
             ))}
           </Segmented>
           {!present.has('usn-journal') && (
-            <span className="text-2xs text-ink-500">
-              USN journal reconstruction is not implemented yet
-            </span>
+            <span className="text-2xs text-ink-500">No USN journal rows in this case</span>
           )}
         </div>
 
-        {timeline.truncated && (
+        {(timeline.truncated || !present.has('usn-journal')) && (
           <div className="border-b border-ink-800 px-4 py-2.5 light:border-ink-100">
             <Notice>{timeline.inclusionPolicy}</Notice>
           </div>

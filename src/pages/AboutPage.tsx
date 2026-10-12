@@ -17,10 +17,10 @@ const DETECTORS: {
   mechanism: string;
 }[] = [
   {
-    id: 'si-fn-created-mismatch',
+    id: 'si-fn-created-mismatch · si-fn-modified-mismatch',
     title: '$SI timestamp precedes $FN',
     mechanism:
-      'A file carries two independent timestamp sets. $STANDARD_INFORMATION (attribute 0x10) is writable from user mode through SetFileTime. $FILE_NAME (0x30) is written only by the kernel, on create, rename and move. $SI earlier than $FN is therefore not reachable through normal filesystem activity — it means $SI was rewritten backwards.',
+      'A file carries two independent timestamp sets. $STANDARD_INFORMATION (attribute 0x10) is writable from user mode through SetFileTime. $FILE_NAME (0x30) is written only by the kernel, on create, rename and move. $SI earlier than $FN is therefore not reachable through normal filesystem activity — it means $SI was rewritten backwards. When the USN journal holds a BASIC_INFO_CHANGE for the file, it is attached as evidence: the kernel’s record of when the timestamps were actually rewritten.',
   },
   {
     id: 'si-subsecond-zeroed',
@@ -33,6 +33,12 @@ const DETECTORS: {
     title: 'Timestamp predates the volume',
     mechanism:
       'The volume creation time is read from the $Volume record. A file claiming to predate the filesystem that contains it is impossible without tampering or a wrong system clock.',
+  },
+  {
+    id: 'si-timestamp-in-future',
+    title: 'Timestamp in the future',
+    mechanism:
+      'A $SI created or modified time later than the moment of the scan. Either the time was written forward deliberately or the clock was wrong when the file was written; reported at medium confidence because both happen.',
   },
   {
     id: 'named-data-stream-present',
@@ -67,12 +73,12 @@ const DETECTORS: {
 ];
 
 const LIMITATIONS: string[] = [
-  '$ATTRIBUTE_LIST extension records are detected and reported as a parse error, but not followed. A heavily fragmented record’s attributes may therefore be incomplete.',
-  'The USN journal ($Extend\\$UsnJrnl:$J) is not yet parsed, so rename and move history is absent. The timeline is built from $SI and $FN only.',
+  'Only the newest 64 MiB of the USN journal is read by default (--usn-limit). History NTFS has already released into sparse runs is gone for good, and removable media often has no journal at all — the timeline then falls back to $SI and $FN.',
+  'A file with several hard links is reported under one name and path, the most descriptive of its $FILE_NAME attributes.',
   '$LogFile is not parsed. Neither are Prefetch, registry hives, Shellbags or event logs — this build is an NTFS filesystem tool, not a full artifact suite.',
   'There is no known-good hash suppression, so system binaries are not filtered out by reputation.',
-  'Reads are unbuffered — roughly one aligned read per record. Adequate for a test volume, slow across a full disk.',
   'Recovery of a non-resident file reports whether its clusters are still free. It cannot prove the bytes within them were never overwritten in place.',
+  'An $ATTRIBUTE_LIST extension record that no longer points back to its base record is refused, not merged, and reported as a scan error — so a file whose extension slot was reused may show only part of its attributes.',
 ];
 
 const Section: React.FC<{ title: string; meta?: string; children: React.ReactNode }> = ({

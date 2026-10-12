@@ -15,6 +15,8 @@
                                     (resident: content lives in the MFT record)
       Media\screen-capture.mp4      deleted-recoverable, non-resident
       Tools\install.log             impossible-timestamp (predates the volume)
+      Docs\plan-final.txt           moved from Media\plan.txt - visible only in
+                                    the USN journal, which this script creates
 
     Refuses to run against the system drive. Use a USB stick formatted NTFS, or
     a VHD created with diskpart.
@@ -104,7 +106,9 @@ $stagedPaths = @(
     (Join-Path $docs 'notes.txt'),
     (Join-Path $docs 'handover-credentials.txt'),
     (Join-Path $media 'screen-capture.mp4'),
-    (Join-Path $tools 'install.log')
+    (Join-Path $tools 'install.log'),
+    (Join-Path $docs 'plan-final.txt'),
+    (Join-Path $media 'plan.txt')
 )
 
 $reset = 0
@@ -121,6 +125,26 @@ foreach ($staled in $stagedPaths) {
 if ($reset -gt 0) {
     Write-Host ''
     Write-Host "[*] cleared $reset artifact(s) from a previous run" -ForegroundColor DarkGray
+}
+
+# --- USN change journal -----------------------------------------------------
+
+# Removable media usually has no change journal, and without one the analyzer
+# has no rename/move/delete history to show. Create it before planting so every
+# artifact below is journalled. Needs an elevated prompt.
+
+Write-Host ''
+& fsutil usn queryjournal "${letter}:" *> $null
+if ($LASTEXITCODE -eq 0) {
+    Write-Host '[*] USN journal already active' -ForegroundColor DarkGray
+} else {
+    # 32 MiB maximum, 4 MiB allocation delta: ample for a test volume.
+    & fsutil usn createjournal m=33554432 a=4194304 "${letter}:" *> $null
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host '[*] USN journal created' -ForegroundColor Cyan
+    } else {
+        Write-Host '[!] could not create a USN journal (run elevated). Journal rows will be absent.' -ForegroundColor Yellow
+    }
 }
 
 Write-Host ''
@@ -189,6 +213,17 @@ $blob = [byte[]]::new(5MB)
 (New-Object Random 77).NextBytes($blob)
 [System.IO.File]::WriteAllBytes($nonResident, $blob)
 
+# --- 4b. A move, for the journal ----------------------------------------------
+
+# A move keeps the same MFT record, so the $MFT only shows the new location.
+# The journal records both names: RENAME_OLD_NAME in Media, RENAME_NEW_NAME in
+# Docs. This is the history only the journal can provide.
+$moveFrom = Join-Path $media 'plan.txt'
+$moveTo = Join-Path $docs 'plan-final.txt'
+Set-Content -Path $moveFrom -Value 'Exfiltration plan, draft.' -Encoding UTF8
+Move-Item -Path $moveFrom -Destination $moveTo -Force
+Write-Host '    moved          Media\plan.txt -> Docs\plan-final.txt (journal only)'
+
 # --- 5. Impossible timestamp ------------------------------------------------
 
 $ancient = Join-Path $tools 'install.log'
@@ -218,6 +253,11 @@ Write-Host '      alternate-data-stream    1'
 Write-Host '      deleted-recoverable      2  (one full, one partial)'
 Write-Host '      hidden-system-file       1'
 Write-Host '      impossible-timestamp     1'
+Write-Host ''
+Write-Host '    Expected in the timeline (source USN), if the journal was created:' -ForegroundColor Green
+Write-Host '      moved     Docs\plan-final.txt   (from Media\plan.txt)'
+Write-Host '      deleted   Docs\handover-credentials.txt, Media\screen-capture.mp4'
+Write-Host '      USN BASIC_INFO_CHANGE cited as evidence on the svchost.exe timestomp'
 Write-Host ''
 Write-Host '    Now run, from an elevated prompt:' -ForegroundColor Cyan
 Write-Host "      python analyzer\checkup.py ${letter}: -o case.json"

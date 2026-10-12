@@ -322,6 +322,129 @@ def build_boot_sector() -> bytes:
     return bytes(data)
 
 
+#: The single allocated cluster of $UsnJrnl:$J. The two clusters before it are
+#: sparse: history NTFS has already released.
+USN_JOURNAL_CLUSTER = 50
+USN_SPARSE_CLUSTERS = 2
+
+#: A record wiped from the $MFT entirely, known only to the journal.
+WIPED_RECORD = 25
+WIPED_SEQUENCE = 3
+
+FT_JOURNAL_CREATE = filetime_from_iso("2026-07-19T11:02:44.320Z")
+FT_JOURNAL_TIMESTOMP = filetime_from_iso("2026-07-20T14:40:03.118Z")
+FT_JOURNAL_ADS = filetime_from_iso("2026-07-20T14:35:02.881Z")
+FT_JOURNAL_MOVE = filetime_from_iso("2026-07-20T15:10:27.004Z")
+FT_JOURNAL_WIPED_CREATE = filetime_from_iso("2026-07-20T17:01:12.550Z")
+FT_JOURNAL_WIPED_DELETE = filetime_from_iso("2026-07-20T17:59:48.902Z")
+FT_JOURNAL_APPEND = filetime_from_iso("2026-07-21T09:00:00.125Z")
+
+# USN reason flags used by the planted journal.
+USN_DATA_EXTEND = 0x00000002
+USN_NAMED_DATA_EXTEND = 0x00000020
+USN_FILE_CREATE = 0x00000100
+USN_FILE_DELETE = 0x00000200
+USN_RENAME_OLD_NAME = 0x00001000
+USN_RENAME_NEW_NAME = 0x00002000
+USN_BASIC_INFO_CHANGE = 0x00008000
+USN_STREAM_CHANGE = 0x00200000
+USN_CLOSE = 0x80000000
+
+
+def usn_record_v2(
+    usn: int,
+    timestamp: int,
+    file_record: int,
+    parent_record: int,
+    reason: int,
+    name: str,
+    file_sequence: int = 1,
+    parent_sequence: int = 1,
+) -> bytes:
+    encoded = name.encode("utf-16-le")
+    length = _align8(0x3C + len(encoded))
+    record = bytearray(length)
+    struct.pack_into("<IHH", record, 0x00, length, 2, 0)
+    struct.pack_into(
+        "<QQqqIIII",
+        record,
+        0x08,
+        file_record | (file_sequence << 48),
+        parent_record | (parent_sequence << 48),
+        usn,
+        timestamp,
+        reason,
+        0,  # source info
+        0,  # security id
+        0x20,  # ARCHIVE
+    )
+    struct.pack_into("<HH", record, 0x38, len(encoded), 0x3C)
+    record[0x3C : 0x3C + len(encoded)] = encoded
+    return bytes(record)
+
+
+def usn_record_v3(
+    usn: int, timestamp: int, file_record: int, parent_record: int, reason: int, name: str
+) -> bytes:
+    """Version 3 widens file references to 128 bits; NTFS fills only the low half."""
+    encoded = name.encode("utf-16-le")
+    length = _align8(0x4C + len(encoded))
+    record = bytearray(length)
+    struct.pack_into("<IHH", record, 0x00, length, 3, 0)
+    struct.pack_into("<QQ", record, 0x08, file_record | (1 << 48), 0)
+    struct.pack_into("<QQ", record, 0x18, parent_record | (1 << 48), 0)
+    struct.pack_into("<qqIIII", record, 0x28, usn, timestamp, reason, 0, 0, 0x20)
+    struct.pack_into("<HH", record, 0x48, len(encoded), 0x4C)
+    record[0x4C : 0x4C + len(encoded)] = encoded
+    return bytes(record)
+
+
+def build_journal() -> bytes:
+    """
+    The planted change journal. USNs are byte offsets into $J, so they start
+    past the sparse clusters, as they would on a real volume.
+    """
+    base = USN_SPARSE_CLUSTERS * BYTES_PER_CLUSTER
+    plan = [
+        # report.docx created and written: one operation, two records.
+        ("v2", FT_JOURNAL_CREATE, 13, 12, USN_FILE_CREATE, "report.docx", 1),
+        ("v2", FT_JOURNAL_CREATE, 13, 12, USN_FILE_CREATE | USN_DATA_EXTEND | USN_CLOSE,
+         "report.docx", 1),
+        # An alternate stream added to notes.txt.
+        ("v2", FT_JOURNAL_ADS, 15, 12, USN_STREAM_CHANGE | USN_NAMED_DATA_EXTEND | USN_CLOSE,
+         "notes.txt", 1),
+        # The timestomp itself: SetFileTime shows up as BASIC_INFO_CHANGE.
+        ("v2", FT_JOURNAL_TIMESTOMP, 14, 12, USN_BASIC_INFO_CHANGE | USN_CLOSE,
+         "svchost.exe", 1),
+        # draft-old.docx in the root moved into Docs as draft.docx.
+        ("v2", FT_JOURNAL_MOVE, 20, 5, USN_RENAME_OLD_NAME, "draft-old.docx", 1),
+        ("v2", FT_JOURNAL_MOVE, 20, 12, USN_RENAME_NEW_NAME, "draft.docx", 1),
+        ("v2", FT_JOURNAL_MOVE, 20, 12, USN_RENAME_NEW_NAME | USN_CLOSE, "draft.docx", 1),
+        # A file the $MFT no longer holds at all.
+        ("v2", FT_JOURNAL_WIPED_CREATE, WIPED_RECORD, 12, USN_FILE_CREATE | USN_CLOSE,
+         "exfil.zip", WIPED_SEQUENCE),
+        ("v2", FT_JOURNAL_WIPED_DELETE, WIPED_RECORD, 12, USN_FILE_DELETE | USN_CLOSE,
+         "exfil.zip", WIPED_SEQUENCE),
+        # The handover notes deleted.
+        ("v2", FT_DELETED_AT, 16, 12, USN_FILE_DELETE | USN_CLOSE,
+         "handover-credentials.txt", 1),
+        # A V3 record, as written when the journal runs with maximum version 3.
+        ("v3", FT_JOURNAL_APPEND, 19, 12, USN_DATA_EXTEND | USN_CLOSE, "install.log", 1),
+    ]
+
+    out = bytearray()
+    for version, timestamp, record, parent, reason, name, sequence in plan:
+        usn = base + len(out)
+        if version == "v2":
+            out += usn_record_v2(usn, timestamp, record, parent, reason, name, sequence)
+        else:
+            out += usn_record_v3(usn, timestamp, record, parent, reason, name)
+    return bytes(out)
+
+
+JOURNAL = build_journal()
+
+
 #: Content of the deleted resident file, recovered byte-for-byte by the analyzer.
 RESIDENT_SECRET = (
     b"# Handover notes - delete before leaving\n"
@@ -333,7 +456,11 @@ RESIDENT_SECRET = (
 #: 40-43 are the second $MFT extent; 45 and 47 the two halves of the
 #: fragmented file described through $ATTRIBUTE_LIST.
 ALLOCATED_CLUSTERS = (
-    set(range(0, BITMAP_CLUSTER + 1)) | {13, 14, 20} | set(range(40, 44)) | {45, 47}
+    set(range(0, BITMAP_CLUSTER + 1))
+    | {13, 14, 20}
+    | set(range(40, 44))
+    | {45, 47}
+    | {USN_JOURNAL_CLUSTER}
 )
 
 #: Content of the $ATTRIBUTE_LIST file: one cluster at 45, then 100 bytes at
@@ -698,6 +825,47 @@ def build_image() -> bytes:
                 ),
             ],
             base_record=21,
+        ),
+    )
+
+    # --- 11: $Extend, and 24: its child $UsnJrnl ----------------------------
+    place(
+        11,
+        build_record(
+            11,
+            [
+                resident_attribute(
+                    TYPE_STANDARD_INFORMATION,
+                    standard_information(
+                        FT_VOLUME_CREATED, FT_VOLUME_CREATED, FT_VOLUME_CREATED, FT_VOLUME_CREATED
+                    ),
+                ),
+                resident_attribute(TYPE_FILE_NAME, file_name("$Extend", parent_record=5)),
+            ],
+            is_directory=True,
+        ),
+    )
+    volume.write_cluster(USN_JOURNAL_CLUSTER, JOURNAL)
+    place(
+        24,
+        build_record(
+            24,
+            [
+                resident_attribute(
+                    TYPE_STANDARD_INFORMATION,
+                    standard_information(
+                        FT_VOLUME_CREATED, FT_VOLUME_CREATED, FT_VOLUME_CREATED, FT_VOLUME_CREATED
+                    ),
+                ),
+                resident_attribute(TYPE_FILE_NAME, file_name("$UsnJrnl", parent_record=11)),
+                resident_attribute(TYPE_DATA, b"\x00" * 32, name="$Max"),
+                non_resident_attribute(
+                    TYPE_DATA,
+                    [(None, USN_SPARSE_CLUSTERS), (USN_JOURNAL_CLUSTER, 1)],
+                    USN_SPARSE_CLUSTERS * BYTES_PER_CLUSTER + len(JOURNAL),
+                    name="$J",
+                ),
+            ],
         ),
     )
 

@@ -20,6 +20,7 @@ STAGES = (
     "paths",
     "recovery",
     "detect",
+    "usn",
     "report",
 )
 
@@ -28,6 +29,7 @@ STAGE_LABELS = {
     "boot": "Reading $Boot",
     "mft": "Parsing $MFT",
     "paths": "Reconstructing paths",
+    "usn": "Reading USN journal",
     "recovery": "Assessing recovery",
     "detect": "Running detectors",
     "report": "Building report",
