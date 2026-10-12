@@ -8,6 +8,7 @@
 
 import React from 'react';
 import clsx from 'clsx';
+import { ChevronRight } from 'lucide-react';
 import { Severity } from '../../types';
 import { severityBg, severityText } from '../../utils/formatters';
 
@@ -40,6 +41,26 @@ export const PanelHeader: React.FC<{
 // ---------------------------------------------------------------------------
 
 /** Forensic identifiers: paths, hashes, record numbers, timestamps. */
+/**
+ * The expand affordance for any row that opens. A chevron that turns, rather
+ * than a bare +/- glyph, because it reads as "there is more here" before
+ * anyone has clicked.
+ */
+export const Disclosure: React.FC<{ open: boolean; className?: string }> = ({
+  open,
+  className,
+}) => (
+  <ChevronRight
+    aria-hidden
+    className={clsx(
+      'h-3.5 w-3.5 shrink-0 text-ink-500 transition-transform group-hover:text-ink-300',
+      'light:group-hover:text-ink-800',
+      open && 'rotate-90',
+      className
+    )}
+  />
+);
+
 export const Mono: React.FC<{
   children: React.ReactNode;
   className?: string;
@@ -77,7 +98,9 @@ export const Field: React.FC<{
     <dt className="field-label">{label}</dt>
     <dd
       className={clsx(
-        'mt-0.5 truncate text-xs text-ink-100 light:text-ink-900',
+        // Wrap, never truncate: a clipped timestamp loses exactly the part
+        // (milliseconds, the UTC marker) that makes it evidence.
+        'mt-0.5 break-words text-xs text-ink-100 light:text-ink-900',
         mono && 'font-mono'
       )}
     >
@@ -168,7 +191,7 @@ export const SegmentedOption: React.FC<{
     onClick={onClick}
     aria-pressed={active}
     className={clsx(
-      'rounded-sm px-2 py-1 text-2xs font-medium transition-colors',
+      'rounded-sm px-2.5 py-1 text-xs font-medium transition-colors',
       active
         ? 'bg-ink-750 text-ink-50 light:bg-ink-100 light:text-ink-900'
         : 'text-ink-400 hover:text-ink-200 light:text-ink-500 light:hover:text-ink-800'
@@ -184,7 +207,7 @@ export const Segmented: React.FC<{ children: React.ReactNode; className?: string
 }) => (
   <div
     className={clsx(
-      'inline-flex gap-0.5 rounded border border-ink-800 bg-ink-850 p-0.5',
+      'inline-flex flex-wrap gap-0.5 rounded border border-ink-800 bg-ink-850 p-0.5',
       'light:border-ink-100 light:bg-ink-25',
       className
     )}

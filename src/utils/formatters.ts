@@ -87,7 +87,13 @@ export const getRecoveryStyle = (confidence: RecoveryConfidence): string =>
   RECOVERY_STYLES[confidence] ?? RECOVERY_STYLES['metadata-only'];
 
 /** "timestomp" -> "Timestomp", "alternate-data-stream" -> "Alternate data stream" */
+/** Filesystem acronyms stay capitalised: "MFT modified", not "Mft modified". */
+const ACRONYMS = new Set(['mft', 'usn', 'ads', 'si', 'fn']);
+
 export const humanizeSlug = (slug: string): string => {
-  const spaced = slug.replace(/-/g, ' ');
+  const words = slug
+    .split('-')
+    .map((word) => (ACRONYMS.has(word) ? word.toUpperCase() : word));
+  const spaced = words.join(' ');
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 };

@@ -9,8 +9,9 @@ import plugin from 'tailwindcss/plugin';
  *  - Neutrals carry the whole interface. Colour is reserved for severity, so
  *    when something is coloured it means something.
  *  - Small radii (2-6px). Nothing is a pill or a circle.
- *  - A dense type scale: 13px body, because a forensic report is a data
- *    surface, not a landing page.
+ *  - A dense type scale: 14px body, because a forensic report is a data
+ *    surface, not a landing page - but nothing below 11px, and no muted text
+ *    under 4.5:1 contrast. Dense is fine; squinting is not.
  *  - Hairline borders instead of shadows. Elevation is communicated by
  *    surface value, the way native tooling does it.
  */
@@ -87,13 +88,34 @@ export default {
           'monospace',
         ],
       },
+      // Muted text greys are theme-aware variables (see index.css): a grey
+      // that reads on near-black is too faint on white, and vice versa, so the
+      // same class resolves to a lighter value in dark mode and a darker one in
+      // light mode. Backgrounds and borders keep the fixed ink scale.
+      textColor: {
+        ink: {
+          300: 'rgb(var(--text-ink-300) / <alpha-value>)',
+          400: 'rgb(var(--text-ink-400) / <alpha-value>)',
+          500: 'rgb(var(--text-ink-500) / <alpha-value>)',
+          600: 'rgb(var(--text-ink-600) / <alpha-value>)',
+        },
+        // Severity as text needs darker values on white than on near-black;
+        // severity bars keep the fixed palette below in both themes.
+        sev: {
+          critical: 'rgb(var(--text-sev-critical) / <alpha-value>)',
+          high: 'rgb(var(--text-sev-high) / <alpha-value>)',
+          medium: 'rgb(var(--text-sev-medium) / <alpha-value>)',
+          low: 'rgb(var(--text-sev-low) / <alpha-value>)',
+          info: 'rgb(var(--text-sev-info) / <alpha-value>)',
+        },
+      },
       fontSize: {
-        micro: ['0.625rem', { lineHeight: '0.875rem', letterSpacing: '0.08em' }],
-        '2xs': ['0.6875rem', { lineHeight: '1rem' }],
-        xs: ['0.75rem', { lineHeight: '1.125rem' }],
-        sm: ['0.8125rem', { lineHeight: '1.25rem' }],
-        base: ['0.875rem', { lineHeight: '1.375rem' }],
-        md: ['0.9375rem', { lineHeight: '1.5rem' }],
+        micro: ['0.6875rem', { lineHeight: '1rem', letterSpacing: '0.06em' }],
+        '2xs': ['0.75rem', { lineHeight: '1.125rem' }],
+        xs: ['0.8125rem', { lineHeight: '1.25rem' }],
+        sm: ['0.875rem', { lineHeight: '1.375rem' }],
+        base: ['0.9375rem', { lineHeight: '1.5rem' }],
+        md: ['1rem', { lineHeight: '1.5rem' }],
         lg: ['1.0625rem', { lineHeight: '1.625rem' }],
         xl: ['1.3125rem', { lineHeight: '1.875rem' }],
         '2xl': ['1.75rem', { lineHeight: '2.25rem' }],

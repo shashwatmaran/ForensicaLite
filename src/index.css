@@ -3,12 +3,34 @@
 @tailwind utilities;
 
 @layer base {
+  /* Muted text greys, as space-separated RGB so Tailwind's opacity modifiers
+     work. Dark values clear 4.5:1 on every dark surface; light values clear
+     it on white. The ladder stays ordered: 300 is the strongest muted tone,
+     600 the faintest. */
   :root {
     color-scheme: dark;
+    --text-ink-300: 163 171 182;
+    --text-ink-400: 147 155 167;
+    --text-ink-500: 133 141 153;
+    --text-ink-600: 121 129 141;
+    --text-sev-critical: 242 85 90;
+    --text-sev-high: 240 145 63;
+    --text-sev-medium: 220 187 69;
+    --text-sev-low: 90 169 230;
+    --text-sev-info: 143 151 163;
   }
 
   html.light {
     color-scheme: light;
+    --text-ink-300: 107 115 127;
+    --text-ink-400: 93 101 113;
+    --text-ink-500: 77 84 95;
+    --text-ink-600: 59 65 75;
+    --text-sev-critical: 196 38 44;
+    --text-sev-high: 180 83 9;
+    --text-sev-medium: 138 106 0;
+    --text-sev-low: 29 111 184;
+    --text-sev-info: 93 101 113;
   }
 
   html,

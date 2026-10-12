@@ -35,7 +35,7 @@ const Metric: React.FC<{
     >
       {value}
     </p>
-    {note && <p className="mt-1.5 text-2xs text-ink-500">{note}</p>}
+    {note && <p className="mt-1.5 text-2xs text-ink-400">{note}</p>}
   </div>
 );
 
@@ -81,7 +81,7 @@ const Overview: React.FC<{ data: CaseFile }> = ({ data }) => {
       <div className="grid gap-4 lg:grid-cols-2">
         <Panel>
           <PanelHeader title="Volume" meta="$Boot" />
-          <dl className="grid grid-cols-2 gap-x-6 gap-y-3.5 px-4 py-3.5 sm:grid-cols-3">
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-4 px-4 py-4">
             <Field label="Label">{volume.label ?? '—'}</Field>
             <Field label="Mount" mono>
               {volume.driveLetter ?? 'image'}
@@ -119,7 +119,7 @@ const Overview: React.FC<{ data: CaseFile }> = ({ data }) => {
 
         <Panel>
           <PanelHeader title="Acquisition" meta={`${generator.tool} ${generator.version}`} />
-          <dl className="grid grid-cols-2 gap-x-6 gap-y-3.5 px-4 py-3.5 sm:grid-cols-3">
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-4 px-4 py-4">
             <Field label="Case" mono>
               {scan.caseId}
             </Field>

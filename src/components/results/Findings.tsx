@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import clsx from 'clsx';
 import { Finding, Severity } from '../../types';
-import { SEVERITY_ORDER, humanizeSlug, severityBg } from '../../utils/formatters';
+import { SEVERITY_ORDER, formatUtc, humanizeSlug, severityBg } from '../../utils/formatters';
 import {
   EmptyState,
   Mono,
+  Disclosure,
   Panel,
   PanelHeader,
   PathText,
@@ -22,6 +23,9 @@ import {
  * rather than something to take on trust.
  */
 
+/** Evidence values are strings; ones that are ISO instants read as UTC like everywhere else. */
+const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
+
 const EvidenceTable: React.FC<{ finding: Finding }> = ({ finding }) => (
   <div className="overflow-x-auto border-t border-ink-800 bg-ink-950/40 light:border-ink-100 light:bg-ink-25">
     <table className="w-full min-w-[30rem] text-left">
@@ -33,14 +37,14 @@ const EvidenceTable: React.FC<{ finding: Finding }> = ({ finding }) => (
           >
             <th
               scope="row"
-              className="w-44 py-1.5 pl-11 pr-3 align-top text-2xs font-normal text-ink-500"
+              className="w-48 py-2 pl-14 pr-3 align-top text-xs font-normal text-ink-400"
             >
               {item.label}
             </th>
-            <td className="py-1.5 pr-3 align-top font-mono text-xs text-ink-100 light:text-ink-900">
-              {item.value}
+            <td className="py-2 pr-3 align-top font-mono text-xs text-ink-100 light:text-ink-900">
+              {ISO_TIMESTAMP.test(item.value) ? formatUtc(item.value) : item.value}
             </td>
-            <td className="py-1.5 pr-4 align-top text-2xs text-ink-500">{item.note ?? ''}</td>
+            <td className="py-2 pr-4 align-top text-xs text-ink-400">{item.note ?? ''}</td>
           </tr>
         ))}
       </tbody>
@@ -56,40 +60,49 @@ const FindingRow: React.FC<{ finding: Finding }> = ({ finding }) => {
       <button
         onClick={() => setOpen((prev) => !prev)}
         aria-expanded={open}
-        className="group flex w-full items-start gap-3 px-4 py-2.5 text-left transition-colors hover:bg-ink-850 light:hover:bg-ink-25"
+        className="group flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-ink-850 light:hover:bg-ink-25"
       >
+        <Disclosure open={open} className="mt-1" />
         <span
-          className={clsx('mt-1 h-8 w-0.5 shrink-0', severityBg(finding.severity))}
+          className={clsx('mt-0.5 h-10 w-0.5 shrink-0', severityBg(finding.severity))}
           aria-hidden
         />
 
         <span className="min-w-0-fix flex-1">
           <span className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
-            <span className="text-sm text-ink-50 light:text-ink-900">{finding.title}</span>
+            <span className="text-sm font-medium text-ink-50 light:text-ink-900">
+              {finding.title}
+            </span>
             <SeverityMark severity={finding.severity} />
           </span>
 
-          <span className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-            <span className="min-w-0-fix max-w-full flex-1 basis-64">
-              <PathText path={finding.filePath} className="text-2xs" />
-            </span>
+          <span className="mt-1 block">
+            <PathText path={finding.filePath} className="text-xs" />
+          </span>
+
+          {/* What fired, on which record, how sure: read left to right
+              under the title, not stranded at the far edge of the row. */}
+          <span className="mt-1 flex flex-wrap items-baseline gap-x-2 text-2xs text-ink-400">
             {finding.recordNumber !== null && (
-              <Mono className="text-2xs text-ink-500">MFT #{finding.recordNumber}</Mono>
+              <>
+                <Mono className="text-2xs">MFT #{finding.recordNumber}</Mono>
+                <span aria-hidden>·</span>
+              </>
             )}
-            <Mono className="text-2xs text-ink-500">{finding.detectedBy}</Mono>
-            <span className="text-2xs text-ink-500">{finding.confidence} confidence</span>
+            <Mono className="text-2xs">{finding.detectedBy}</Mono>
+            <span aria-hidden>·</span>
+            <span>{finding.confidence} confidence</span>
           </span>
         </span>
 
-        <span className="mt-0.5 shrink-0 font-mono text-2xs text-ink-600 transition-colors group-hover:text-ink-400">
-          {open ? '−' : '+'}
-          {finding.evidence.length}
+        <span className="mt-0.5 shrink-0 text-2xs text-ink-500 transition-colors group-hover:text-ink-300 light:group-hover:text-ink-800">
+          {finding.evidence.length} evidence {finding.evidence.length === 1 ? 'item' : 'items'}
         </span>
       </button>
 
       {open && (
         <div>
-          <p className="px-4 pb-3 pl-11 text-xs leading-relaxed text-ink-300 light:text-ink-600">
+          <p className="max-w-3xl px-4 pb-3 pl-14 text-sm leading-relaxed text-ink-200 light:text-ink-700">
             {finding.description}
           </p>
           {finding.evidence.length > 0 && <EvidenceTable finding={finding} />}
@@ -135,9 +148,7 @@ const Findings: React.FC<{ findings: Finding[] }> = ({ findings }) => {
   return (
     <div className="space-y-4">
       <Panel>
-        <PanelHeader title="Findings" meta={`${ordered.length} of ${findings.length}`}>
-          <span />
-        </PanelHeader>
+        <PanelHeader title="Findings" meta={`${ordered.length} of ${findings.length}`} />
 
         <div className="flex flex-wrap items-center gap-2 border-b border-ink-800 px-4 py-2.5 light:border-ink-100">
           <Segmented>
@@ -162,8 +173,8 @@ const Findings: React.FC<{ findings: Finding[] }> = ({ findings }) => {
               return (
                 <span key={severity} className="inline-flex items-center gap-1.5">
                   <span className={clsx('h-2 w-0.5', severityBg(severity))} aria-hidden />
-                  <span className="font-mono text-2xs text-ink-400">{count}</span>
-                  <span className="text-2xs text-ink-500">{severity}</span>
+                  <span className="font-mono text-xs text-ink-200 light:text-ink-800">{count}</span>
+                  <span className="text-xs text-ink-400">{severity}</span>
                 </span>
               );
             })}

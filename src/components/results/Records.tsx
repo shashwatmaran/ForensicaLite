@@ -10,6 +10,7 @@ import {
 import {
   EmptyState,
   Mono,
+  Disclosure,
   Notice,
   Panel,
   PanelHeader,
@@ -98,7 +99,7 @@ const RecordDetail: React.FC<{ file: MftFile }> = ({ file }) => {
                       <td className="py-1.5 pr-3">
                         <Mono
                           className={clsx(
-                            'text-xs',
+                            'whitespace-nowrap text-xs',
                             backdated
                               ? 'text-sev-critical'
                               : 'text-ink-100 light:text-ink-900'
@@ -107,13 +108,13 @@ const RecordDetail: React.FC<{ file: MftFile }> = ({ file }) => {
                           {formatUtc(si.iso)}
                         </Mono>
                         {backdated && (
-                          <span className="ml-2 text-micro font-semibold uppercase text-sev-critical">
+                          <span className="block text-micro font-semibold uppercase text-sev-critical">
                             precedes $FN
                           </span>
                         )}
                       </td>
                       <td className="py-1.5">
-                        <Mono className="text-xs text-ink-400 light:text-ink-500">
+                        <Mono className="whitespace-nowrap text-xs text-ink-300 light:text-ink-600">
                           {fn ? formatUtc(fn.iso) : '—'}
                         </Mono>
                       </td>
@@ -318,7 +319,7 @@ const Records: React.FC<{ files: Collection<MftFile> }> = ({ files }) => {
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="filter by name or path"
-          className="w-56 rounded border border-ink-700 bg-ink-950 px-2 py-1 font-mono text-xs text-ink-100 placeholder:text-ink-600 focus:border-accent-600 focus:outline-none light:border-ink-200 light:bg-white light:text-ink-900 light:placeholder:text-ink-300"
+          className="w-64 rounded border border-ink-700 bg-ink-950 px-2.5 py-1.5 text-xs text-ink-100 placeholder:text-ink-500 focus:border-accent-600 focus:outline-none light:border-ink-200 light:bg-white light:text-ink-900 light:placeholder:text-ink-300"
         />
 
         <Segmented>
@@ -360,7 +361,7 @@ const Records: React.FC<{ files: Collection<MftFile> }> = ({ files }) => {
           <table className="w-full min-w-[44rem] text-left">
             <thead className="border-b border-ink-800 light:border-ink-100">
               <tr>
-                <th className="w-6" />
+                <th className="w-8" />
                 <HeaderCell
                   field="recordNumber"
                   sortField={sortField}
@@ -384,7 +385,7 @@ const Records: React.FC<{ files: Collection<MftFile> }> = ({ files }) => {
                   sortField={sortField}
                   direction={direction}
                   onSort={handleSort}
-                  className="w-24 pr-3"
+                  className="w-32 pr-3"
                 >
                   Size
                 </HeaderCell>
@@ -393,7 +394,7 @@ const Records: React.FC<{ files: Collection<MftFile> }> = ({ files }) => {
                   sortField={sortField}
                   direction={direction}
                   onSort={handleSort}
-                  className="w-52 pr-3"
+                  className="w-60 pr-3"
                 >
                   $SI modified
                 </HeaderCell>
@@ -418,22 +419,32 @@ const Records: React.FC<{ files: Collection<MftFile> }> = ({ files }) => {
                   <React.Fragment key={file.recordNumber}>
                     <tr
                       onClick={() => setExpanded(open ? null : file.recordNumber)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          setExpanded(open ? null : file.recordNumber);
+                        }
+                      }}
+                      tabIndex={0}
+                      aria-expanded={open}
                       className={clsx(
-                        'cursor-pointer border-b border-ink-850 transition-colors light:border-ink-50',
+                        'group cursor-pointer border-b border-ink-850 transition-colors light:border-ink-50',
                         open
                           ? 'bg-ink-850 light:bg-ink-25'
                           : 'hover:bg-ink-850 light:hover:bg-ink-25'
                       )}
                     >
-                      <td className="pl-3 font-mono text-2xs text-ink-600">{open ? '−' : '+'}</td>
-                      <td className="py-2 pr-3 font-mono text-xs text-ink-500">
+                      <td className="pl-3">
+                        <Disclosure open={open} />
+                      </td>
+                      <td className="py-2.5 pr-3 font-mono text-xs text-ink-400">
                         {file.recordNumber}
                       </td>
-                      <td className="min-w-0-fix py-2 pr-3">
+                      <td className="min-w-0-fix py-2.5 pr-3">
                         <div className="flex items-baseline gap-2">
                           <span
                             className={clsx(
-                              'truncate text-xs',
+                              'truncate text-sm',
                               file.isDirectory
                                 ? 'text-accent-300 light:text-accent-700'
                                 : 'text-ink-50 light:text-ink-900'
@@ -445,40 +456,41 @@ const Records: React.FC<{ files: Collection<MftFile> }> = ({ files }) => {
                           {ads.length > 0 && (
                             <span
                               title={`${ads.length} alternate data stream(s)`}
-                              className="font-mono text-micro font-semibold uppercase text-sev-high"
+                              className="text-2xs font-semibold text-sev-high"
                             >
-                              ads{ads.length > 1 ? `·${ads.length}` : ''}
+                              {ads.length === 1 ? 'hidden stream' : `${ads.length} hidden streams`}
                             </span>
                           )}
                           {file.findingIds.length > 0 && (
                             <span
                               title={`${file.findingIds.length} finding(s)`}
-                              className="font-mono text-micro text-sev-critical"
+                              className="text-2xs font-semibold text-sev-critical"
                             >
-                              !{file.findingIds.length}
+                              {file.findingIds.length} finding
+                              {file.findingIds.length === 1 ? '' : 's'}
                             </span>
                           )}
                         </div>
-                        <PathText path={file.filePath} className="mt-0.5 text-micro" />
+                        <PathText path={file.filePath} className="mt-0.5 text-2xs" />
                       </td>
-                      <td className="whitespace-nowrap py-2 pr-3 font-mono text-xs text-ink-300 light:text-ink-600">
+                      <td className="whitespace-nowrap py-2.5 pr-3 font-mono text-xs text-ink-200 light:text-ink-700">
                         {formatFileSize(file.size)}
                         {stream?.residency === 'resident' && (
                           <span
                             title="Stored inside the MFT record — survives deletion intact"
-                            className="ml-1.5 text-micro uppercase text-accent-400"
+                            className="ml-1.5 text-2xs text-accent-400 light:text-accent-700"
                           >
-                            res
+                            resident
                           </span>
                         )}
                       </td>
-                      <td className="whitespace-nowrap py-2 pr-3 font-mono text-xs text-ink-400 light:text-ink-500">
+                      <td className="whitespace-nowrap py-2.5 pr-3 font-mono text-xs text-ink-300 light:text-ink-600">
                         {formatUtc(file.standardInfo.modified.iso)}
                       </td>
-                      <td className="py-2 pr-4">
+                      <td className="py-2.5 pr-4">
                         <span
                           className={clsx(
-                            'text-2xs',
+                            'text-xs',
                             file.status === 'deleted'
                               ? 'text-sev-high'
                               : 'text-ink-400 light:text-ink-500'

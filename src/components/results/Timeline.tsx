@@ -65,7 +65,9 @@ const Timeline: React.FC<{
   const [sourceFilter, setSourceFilter] = useState<TimelineSource | 'all'>('all');
 
   const grid = dark ? '#1b1f26' : '#e8ebef';
-  const tick = dark ? '#6b737f' : '#8f97a3';
+  // Same values as the --text-ink-400 token: axis labels are text, and get
+  // the same contrast floor as any other muted text.
+  const tick = dark ? '#939ba7' : '#5d6571';
 
   const chartData = useMemo(
     () => ({
@@ -96,8 +98,8 @@ const Timeline: React.FC<{
             color: tick,
             boxWidth: 8,
             boxHeight: 8,
-            font: { size: 10 },
-            padding: 14,
+            font: { size: 12 },
+            padding: 16,
             usePointStyle: false,
           },
         },
@@ -107,8 +109,8 @@ const Timeline: React.FC<{
           borderWidth: 1,
           titleColor: dark ? '#dde1e7' : '#101216',
           bodyColor: dark ? '#b7bec8' : '#363c46',
-          titleFont: { size: 11 },
-          bodyFont: { size: 11, family: 'ui-monospace, monospace' },
+          titleFont: { size: 12 },
+          bodyFont: { size: 12, family: 'ui-monospace, monospace' },
           cornerRadius: 3,
           displayColors: true,
           boxWidth: 8,
@@ -119,14 +121,14 @@ const Timeline: React.FC<{
       scales: {
         x: {
           stacked: true,
-          ticks: { color: tick, font: { size: 10 }, maxRotation: 0, autoSkipPadding: 16 },
+          ticks: { color: tick, font: { size: 12 }, maxRotation: 0, autoSkipPadding: 16 },
           grid: { display: false },
           border: { color: grid },
         },
         y: {
           stacked: true,
           beginAtZero: true,
-          ticks: { color: tick, font: { size: 10 }, precision: 0, maxTicksLimit: 6 },
+          ticks: { color: tick, font: { size: 12 }, precision: 0, maxTicksLimit: 6 },
           grid: { color: grid },
           border: { display: false },
         },
@@ -185,7 +187,7 @@ const Timeline: React.FC<{
             ))}
           </Segmented>
           {!present.has('usn-journal') && (
-            <span className="text-2xs text-ink-500">No USN journal rows in this case</span>
+            <span className="text-xs text-ink-400">No USN journal rows in this case</span>
           )}
         </div>
 
@@ -203,36 +205,47 @@ const Timeline: React.FC<{
               {entries.map((entry, index) => (
                 <li
                   key={`${entry.recordNumber}-${entry.source}-${entry.action}-${index}`}
-                  className="flex items-baseline gap-3 border-b border-ink-850 px-4 py-1.5 last:border-0 hover:bg-ink-850 light:border-ink-50 light:hover:bg-ink-25"
+                  className="flex items-baseline gap-3 border-b border-ink-850 px-4 py-2 last:border-0 hover:bg-ink-850 light:border-ink-50 light:hover:bg-ink-25"
                 >
-                  <Mono className="shrink-0 text-2xs text-ink-400 light:text-ink-500">
+                  <Mono className="shrink-0 text-xs text-ink-300 light:text-ink-600">
                     {formatUtc(entry.timestamp)}
                   </Mono>
                   <Mono
                     title={SOURCE_TITLE[entry.source]}
                     className={clsx(
-                      'w-9 shrink-0 text-2xs',
-                      entry.source === 'mft-si' ? 'text-ink-300' : 'text-accent-400'
+                      'w-10 shrink-0 text-xs',
+                      entry.source === 'mft-si'
+                        ? 'text-ink-300'
+                        : 'text-accent-400 light:text-accent-700'
                     )}
                   >
                     {SOURCE_LABEL[entry.source]}
                   </Mono>
-                  <span className="w-24 shrink-0 text-2xs text-ink-200 light:text-ink-800">
+                  <span className="w-28 shrink-0 text-xs text-ink-100 light:text-ink-900">
                     {humanizeSlug(entry.action)}
                   </span>
                   <span className="min-w-0-fix flex-1">
-                    <PathText path={entry.filePath} className="text-2xs" />
+                    <PathText path={entry.filePath} className="text-xs" />
+                    {/* Journal rows carry what MACB rows cannot: the old name
+                        on a rename or move, and the raw reason flags. */}
+                    {entry.source === 'usn-journal' && entry.detail && (
+                      <span className="mt-0.5 block truncate font-mono text-2xs text-ink-400">
+                        {entry.detail}
+                      </span>
+                    )}
                   </span>
-                  {entry.recordNumber !== null && (
-                    <Mono className="shrink-0 text-2xs text-ink-600">#{entry.recordNumber}</Mono>
-                  )}
                   {entry.findingIds.length > 0 && (
                     <span
-                      className="shrink-0 font-mono text-2xs text-sev-high"
-                      title={`${entry.findingIds.length} finding(s) reference this record`}
+                      className="shrink-0 text-2xs font-semibold text-sev-high"
+                      title="Findings on this record — open the Findings section for the evidence"
                     >
-                      !{entry.findingIds.length}
+                      {entry.findingIds.length} finding{entry.findingIds.length === 1 ? '' : 's'}
                     </span>
+                  )}
+                  {entry.recordNumber !== null && (
+                    <Mono className="w-20 shrink-0 text-right text-2xs text-ink-400">
+                      MFT #{entry.recordNumber}
+                    </Mono>
                   )}
                 </li>
               ))}
