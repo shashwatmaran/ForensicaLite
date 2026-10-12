@@ -31,6 +31,13 @@ MFT_START_CLUSTER = 4
 MFT_CLUSTERS = 8
 MFT_RECORD_SLOTS = MFT_CLUSTERS * BYTES_PER_CLUSTER // MFT_RECORD_SIZE  # 32
 
+#: The $MFT is deliberately fragmented, as it is on any well-used volume: the
+#: first half of its records sit at cluster 4, the second half at cluster 40,
+#: reached only through record 0's run list. A parser that assumes the table is
+#: contiguous reads records 16-31 from the wrong clusters.
+MFT_EXTENTS: Tuple[Tuple[int, int], ...] = ((MFT_START_CLUSTER, 4), (40, 4))
+RECORDS_PER_CLUSTER = BYTES_PER_CLUSTER // MFT_RECORD_SIZE
+
 BITMAP_CLUSTER = 12
 VOLUME_SERIAL = 0x7A3C91E40B28F5D6
 
@@ -39,6 +46,7 @@ USN = b"\xaa\xbb"
 # Attribute type ids, repeated here so the builder does not depend on the code
 # under test for the constants it encodes.
 TYPE_STANDARD_INFORMATION = 0x10
+TYPE_ATTRIBUTE_LIST = 0x20
 TYPE_FILE_NAME = 0x30
 TYPE_VOLUME_NAME = 0x60
 TYPE_VOLUME_INFORMATION = 0x70
@@ -123,7 +131,9 @@ def _minimal_int(value: int, signed: bool) -> bytes:
     raise ValueError(f"cannot encode {value} in 8 bytes (signed={signed})")
 
 
-def resident_attribute(type_id: int, content: bytes, name: str = "") -> bytes:
+def resident_attribute(
+    type_id: int, content: bytes, name: str = "", attribute_id: int = 0
+) -> bytes:
     encoded_name = name.encode("utf-16-le")
     name_offset = 0x18
     content_offset = _align8(name_offset + len(encoded_name))
@@ -135,6 +145,7 @@ def resident_attribute(type_id: int, content: bytes, name: str = "") -> bytes:
     attribute[0x08] = 0  # resident
     attribute[0x09] = len(name)
     struct.pack_into("<H", attribute, 0x0A, name_offset)
+    struct.pack_into("<H", attribute, 0x0E, attribute_id)
     struct.pack_into("<I", attribute, 0x10, len(content))
     struct.pack_into("<H", attribute, 0x14, content_offset)
 
@@ -148,7 +159,15 @@ def non_resident_attribute(
     runs: Sequence[Tuple[Optional[int], int]],
     real_size: int,
     name: str = "",
+    attribute_id: int = 0,
+    starting_vcn: int = 0,
 ) -> bytes:
+    """
+    A non-resident attribute, or one segment of it.
+
+    A segment with a non-zero starting VCN is a continuation stored in an
+    extension record; NTFS only keeps the sizes in the segment at VCN 0.
+    """
     encoded_name = name.encode("utf-16-le")
     name_offset = 0x40
     runs_offset = _align8(name_offset + len(encoded_name))
@@ -156,8 +175,10 @@ def non_resident_attribute(
     length = _align8(runs_offset + len(run_bytes))
 
     cluster_total = sum(count for _, count in runs)
-    allocated = cluster_total * BYTES_PER_CLUSTER
-    last_vcn = max(cluster_total - 1, 0)
+    allocated = cluster_total * BYTES_PER_CLUSTER if starting_vcn == 0 else 0
+    last_vcn = starting_vcn + max(cluster_total - 1, 0)
+    if starting_vcn:
+        real_size = 0
 
     attribute = bytearray(length)
     struct.pack_into("<I", attribute, 0x00, type_id)
@@ -165,7 +186,8 @@ def non_resident_attribute(
     attribute[0x08] = 1  # non-resident
     attribute[0x09] = len(name)
     struct.pack_into("<H", attribute, 0x0A, name_offset)
-    struct.pack_into("<Q", attribute, 0x10, 0)  # starting VCN
+    struct.pack_into("<H", attribute, 0x0E, attribute_id)
+    struct.pack_into("<Q", attribute, 0x10, starting_vcn)
     struct.pack_into("<Q", attribute, 0x18, last_vcn)
     struct.pack_into("<H", attribute, 0x20, runs_offset)
     struct.pack_into("<Q", attribute, 0x28, allocated)
@@ -209,6 +231,26 @@ def file_name(
     return bytes(content)
 
 
+def attribute_list_entry(
+    type_id: int,
+    record_number: int,
+    attribute_id: int,
+    starting_vcn: int = 0,
+    record_sequence: int = 1,
+    name: str = "",
+) -> bytes:
+    """One $ATTRIBUTE_LIST row: this attribute, this segment, lives in that record."""
+    encoded = name.encode("utf-16-le")
+    length = _align8(0x1A + len(encoded))
+    entry = bytearray(length)
+    struct.pack_into("<IHBB", entry, 0x00, type_id, length, len(name), 0x1A)
+    struct.pack_into(
+        "<QQH", entry, 0x08, starting_vcn, record_number | (record_sequence << 48), attribute_id
+    )
+    entry[0x1A : 0x1A + len(encoded)] = encoded
+    return bytes(entry)
+
+
 def build_record(
     record_number: int,
     attributes: Sequence[bytes],
@@ -216,6 +258,7 @@ def build_record(
     in_use: bool = True,
     is_directory: bool = False,
     sequence_number: int = 1,
+    base_record: int = 0,
 ) -> bytes:
     """
     Assemble one MFT record, including a correct update sequence array.
@@ -237,7 +280,7 @@ def build_record(
 
     flags = (0x0001 if in_use else 0x0000) | (0x0002 if is_directory else 0x0000)
     struct.pack_into("<H", record, 0x16, flags)
-    struct.pack_into("<Q", record, 0x20, 0)  # no base record
+    struct.pack_into("<Q", record, 0x20, base_record | (1 << 48) if base_record else 0)
     struct.pack_into("<I", record, 0x2C, record_number)
 
     body = b"".join(attributes) + struct.pack("<I", 0xFFFFFFFF)
@@ -287,7 +330,18 @@ RESIDENT_SECRET = (
 )
 
 #: Clusters holding live data, plus cluster 20 which is reused after a delete.
-ALLOCATED_CLUSTERS = set(range(0, BITMAP_CLUSTER + 1)) | {13, 14, 20}
+#: 40-43 are the second $MFT extent; 45 and 47 the two halves of the
+#: fragmented file described through $ATTRIBUTE_LIST.
+ALLOCATED_CLUSTERS = (
+    set(range(0, BITMAP_CLUSTER + 1)) | {13, 14, 20} | set(range(40, 44)) | {45, 47}
+)
+
+#: Content of the $ATTRIBUTE_LIST file: one cluster at 45, then 100 bytes at
+#: 47. Distinct bytes per half, so a hash over the merged stream proves the
+#: segments were joined in VCN order.
+SPLIT_FIRST = bytes(range(256)) * (BYTES_PER_CLUSTER // 256)
+SPLIT_SECOND = b"second segment, from the extension record ".ljust(100, b".")
+SPLIT_CONTENT = SPLIT_FIRST + SPLIT_SECOND
 
 
 @dataclass
@@ -326,7 +380,7 @@ def build_image() -> bytes:
                 resident_attribute(TYPE_FILE_NAME, file_name("$MFT", parent_record=5)),
                 non_resident_attribute(
                     TYPE_DATA,
-                    [(MFT_START_CLUSTER, MFT_CLUSTERS)],
+                    list(MFT_EXTENTS),
                     MFT_CLUSTERS * BYTES_PER_CLUSTER,
                 ),
             ],
@@ -589,8 +643,72 @@ def build_image() -> bytes:
         ),
     )
 
+    # --- 21-23: a file described through $ATTRIBUTE_LIST --------------------
+    # The base record holds only $SI and the list. Its $FILE_NAME and the first
+    # segment of $DATA are in extension record 22; the second $DATA segment is
+    # in 23. Followed correctly this is an ordinary 4196-byte file; read from
+    # the base record alone it has no name and is silently dropped.
+    volume.write_cluster(45, SPLIT_FIRST)
+    volume.write_cluster(47, SPLIT_SECOND)
+    place(
+        21,
+        build_record(
+            21,
+            [
+                resident_attribute(
+                    TYPE_STANDARD_INFORMATION,
+                    standard_information(
+                        FT_NORMAL_CREATED, FT_NORMAL_CREATED, FT_NORMAL_CREATED, FT_NORMAL_CREATED
+                    ),
+                    attribute_id=0,
+                ),
+                resident_attribute(
+                    TYPE_ATTRIBUTE_LIST,
+                    attribute_list_entry(TYPE_STANDARD_INFORMATION, 21, attribute_id=0)
+                    + attribute_list_entry(TYPE_FILE_NAME, 22, attribute_id=2)
+                    + attribute_list_entry(TYPE_DATA, 22, attribute_id=3)
+                    + attribute_list_entry(TYPE_DATA, 23, attribute_id=1, starting_vcn=1),
+                    attribute_id=1,
+                ),
+            ],
+        ),
+    )
+    place(
+        22,
+        build_record(
+            22,
+            [
+                resident_attribute(
+                    TYPE_FILE_NAME, file_name("evidence.bin", parent_record=12), attribute_id=2
+                ),
+                non_resident_attribute(
+                    TYPE_DATA, [(45, 1)], len(SPLIT_CONTENT), attribute_id=3
+                ),
+            ],
+            base_record=21,
+        ),
+    )
+    place(
+        23,
+        build_record(
+            23,
+            [
+                non_resident_attribute(
+                    TYPE_DATA, [(47, 1)], 0, attribute_id=1, starting_vcn=1
+                ),
+            ],
+            base_record=21,
+        ),
+    )
+
+    # Lay records out across the $MFT's extents, in record order.
+    slot_offsets: List[int] = []
+    for start_cluster, cluster_count in MFT_EXTENTS:
+        for index in range(cluster_count * RECORDS_PER_CLUSTER):
+            slot_offsets.append(start_cluster * BYTES_PER_CLUSTER + index * MFT_RECORD_SIZE)
+
     for index, record in enumerate(records):
-        volume.write_at(MFT_START_CLUSTER * BYTES_PER_CLUSTER + index * MFT_RECORD_SIZE, record)
+        volume.write_at(slot_offsets[index], record)
 
     return bytes(volume.image)
 

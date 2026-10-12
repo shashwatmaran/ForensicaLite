@@ -16,6 +16,7 @@ sizes. `apply_fixups` undoes this, and it must run before anything else.
 from __future__ import annotations
 
 import struct
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
@@ -175,6 +176,11 @@ class Attribute:
     runs: List[Tuple[Optional[int], int]] = field(default_factory=list)
     real_size: int = 0
     allocated_size: int = 0
+    #: Unique within the record; what an $ATTRIBUTE_LIST entry refers to.
+    attribute_id: int = 0
+    #: First virtual cluster this segment covers. Non-zero only for the later
+    #: segments of an attribute split across extension records.
+    lowest_vcn: int = 0
 
     @property
     def is_ads(self) -> bool:
@@ -213,6 +219,10 @@ class MftRecord:
     hard_link_count: int
     attributes: List[Attribute]
     has_attribute_list: bool
+    #: Extension records whose attributes were merged in via $ATTRIBUTE_LIST.
+    extension_records: List[int] = field(default_factory=list)
+    #: Non-fatal problems following $ATTRIBUTE_LIST, for the scan error log.
+    attribute_list_problems: List[str] = field(default_factory=list)
 
     def first(self, type_id: int) -> Optional[Attribute]:
         for attribute in self.attributes:
@@ -289,6 +299,7 @@ def _parse_attributes(record: bytes, first_offset: int) -> Tuple[List[Attribute]
         non_resident = record[offset + 0x08] == 1
         name_length = record[offset + 0x09]
         name_offset = struct.unpack_from("<H", record, offset + 0x0A)[0]
+        attribute_id = struct.unpack_from("<H", record, offset + 0x0E)[0]
 
         name = ""
         if name_length:
@@ -298,10 +309,13 @@ def _parse_attributes(record: bytes, first_offset: int) -> Tuple[List[Attribute]
         if type_id == ATTR_ATTRIBUTE_LIST:
             has_attribute_list = True
 
-        attribute = Attribute(type_id=type_id, name=name, non_resident=non_resident)
+        attribute = Attribute(
+            type_id=type_id, name=name, non_resident=non_resident, attribute_id=attribute_id
+        )
 
         if non_resident:
             if offset + 0x38 <= len(record):
+                attribute.lowest_vcn = struct.unpack_from("<Q", record, offset + 0x10)[0]
                 runs_offset = struct.unpack_from("<H", record, offset + 0x20)[0]
                 attribute.allocated_size = struct.unpack_from("<Q", record, offset + 0x28)[0]
                 attribute.real_size = struct.unpack_from("<Q", record, offset + 0x30)[0]
@@ -319,6 +333,102 @@ def _parse_attributes(record: bytes, first_offset: int) -> Tuple[List[Attribute]
         offset += length
 
     return attributes, has_attribute_list
+
+
+@dataclass
+class AttributeListEntry:
+    """One row of an $ATTRIBUTE_LIST: where a given attribute actually lives."""
+
+    type_id: int
+    name: str
+    starting_vcn: int
+    record_number: int
+    record_sequence: int
+    attribute_id: int
+
+
+def parse_attribute_list(content: bytes) -> List[AttributeListEntry]:
+    """
+    Decode $ATTRIBUTE_LIST content.
+
+    A file with more attributes than fit in one 1024-byte record — many hard
+    links, a heavily fragmented stream, a large security descriptor — moves
+    some of them into extension records. The list in the base record names
+    each attribute and the record holding it. Without following it, a parser
+    sees a base record missing its $FILE_NAME or holding only the first slice
+    of a $DATA run list, and reports the wrong size or no file at all.
+    """
+    entries: List[AttributeListEntry] = []
+    offset = 0
+
+    while offset + 0x1A <= len(content):
+        type_id, length, name_length, name_offset = struct.unpack_from("<IHBB", content, offset)
+        if type_id == ATTR_END or length < 0x1A or offset + length > len(content):
+            break
+
+        starting_vcn, reference, attribute_id = struct.unpack_from("<QQH", content, offset + 0x08)
+        name = ""
+        if name_length:
+            start = offset + name_offset
+            name = content[start : start + name_length * 2].decode("utf-16-le", errors="replace")
+
+        entries.append(
+            AttributeListEntry(
+                type_id=type_id,
+                name=name,
+                starting_vcn=starting_vcn,
+                record_number=reference & 0x0000_FFFF_FFFF_FFFF,
+                record_sequence=(reference >> 48) & 0xFFFF,
+                attribute_id=attribute_id,
+            )
+        )
+        offset += length
+
+    return entries
+
+
+def merge_attribute_segments(attributes: List[Attribute]) -> List[Attribute]:
+    """
+    Join non-resident attributes split across records into one.
+
+    Each segment carries its own run list covering a VCN range; in order of
+    lowest VCN they concatenate into the whole stream. Sizes are only valid in
+    the segment starting at VCN 0, so they come from there. Each segment's run
+    list starts its signed deltas from zero, which decode_data_runs already
+    resolved to absolute LCNs, so concatenation needs no rebasing.
+    """
+    merged: List[Attribute] = []
+    groups: Dict[Tuple[int, str], List[Attribute]] = {}
+
+    for attribute in attributes:
+        if not attribute.non_resident:
+            merged.append(attribute)
+            continue
+        key = (attribute.type_id, attribute.name)
+        if key not in groups:
+            groups[key] = []
+            merged.append(attribute)  # placeholder keeps first-seen order
+        groups[key].append(attribute)
+
+    for index, attribute in enumerate(merged):
+        if not attribute.non_resident:
+            continue
+        segments = sorted(groups[(attribute.type_id, attribute.name)], key=lambda a: a.lowest_vcn)
+        if len(segments) == 1:
+            continue
+        first = segments[0]
+        merged[index] = Attribute(
+            type_id=first.type_id,
+            name=first.name,
+            non_resident=True,
+            runs=[run for segment in segments for run in segment.runs],
+            real_size=first.real_size,
+            allocated_size=first.allocated_size,
+            attribute_id=first.attribute_id,
+            lowest_vcn=0,
+        )
+
+    return merged
 
 
 def parse_record(
@@ -418,11 +528,27 @@ class MftReader:
     boot sector, then uses that record's own $DATA run list as the extent map
     for every subsequent read. Going through the run list rather than assuming
     the table is contiguous is what makes this work on a fragmented volume.
+
+    Reads are buffered: the $MFT stream is fetched in CHUNK_BYTES windows and a
+    few recent windows are kept, so a sequential scan costs one disk read per
+    thousand records rather than one per record. On a raw device every read is
+    a syscall and a seek, and that — not parsing — is what dominates a full
+    scan.
     """
+
+    #: Bytes of $MFT fetched per physical read: 1024 records at 1 KiB each.
+    CHUNK_BYTES = 1024 * 1024
+    #: Chunks kept. More than one, so the random reads made while following
+    #: $ATTRIBUTE_LIST or hashing a deleted record do not evict the window the
+    #: sequential scan is working through.
+    CACHE_CHUNKS = 4
 
     def __init__(self, volume: RawVolume, boot: "BootSectorLike") -> None:
         self.volume = volume
         self.boot = boot
+        self._chunks: "OrderedDict[int, bytes]" = OrderedDict()
+        #: Physical reads of the $MFT stream, for tests and throughput logging.
+        self.physical_reads = 0
 
         bootstrap = volume.read(boot.mft_offset, boot.mft_record_size)
         record = parse_record(bootstrap, boot.bytes_per_sector, expected_number=RECORD_MFT)
@@ -437,20 +563,115 @@ class MftReader:
         self.stream_size = data.real_size or data.allocated_size
         self.record_count = self.stream_size // boot.mft_record_size
 
-    def read_record_bytes(self, number: int) -> bytes:
-        return read_runs(
-            self.volume,
-            self.boot.bytes_per_cluster,
-            self.extents,
-            number * self.boot.mft_record_size,
-            self.boot.mft_record_size,
-        )
+        # A heavily fragmented $MFT keeps the rest of its own run list in an
+        # extension record, which the bootstrap extents can normally reach.
+        if record.has_attribute_list:
+            full = self._follow_attribute_list(record).default_stream()
+            if full is not None and full.runs:
+                self.extents = full.runs
+                self._chunks.clear()
 
-    def read(self, number: int) -> Optional[MftRecord]:
+    def _chunk(self, index: int) -> bytes:
+        cached = self._chunks.get(index)
+        if cached is not None:
+            self._chunks.move_to_end(index)
+            return cached
+
+        start = index * self.CHUNK_BYTES
+        length = min(self.CHUNK_BYTES, max(self.stream_size - start, 0))
+        data = read_runs(self.volume, self.boot.bytes_per_cluster, self.extents, start, length)
+        self.physical_reads += 1
+
+        self._chunks[index] = data
+        if len(self._chunks) > self.CACHE_CHUNKS:
+            self._chunks.popitem(last=False)
+        return data
+
+    def read_record_bytes(self, number: int) -> bytes:
+        size = self.boot.mft_record_size
+        offset = number * size
+        index, within = divmod(offset, self.CHUNK_BYTES)
+        if within + size <= self.CHUNK_BYTES:
+            return self._chunk(index)[within : within + size]
+        # Only reachable with a record size that does not divide the chunk.
+        return read_runs(self.volume, self.boot.bytes_per_cluster, self.extents, offset, size)
+
+    def read(self, number: int, follow_attribute_list: bool = True) -> Optional[MftRecord]:
         raw = self.read_record_bytes(number)
         if not raw:
             return None
-        return parse_record(raw, self.boot.bytes_per_sector, expected_number=number)
+        record = parse_record(raw, self.boot.bytes_per_sector, expected_number=number)
+        if (
+            record is not None
+            and follow_attribute_list
+            and record.has_attribute_list
+            and not record.base_record
+        ):
+            return self._follow_attribute_list(record)
+        return record
+
+    def _attribute_list_content(self, record: MftRecord) -> Optional[bytes]:
+        attribute = record.first(ATTR_ATTRIBUTE_LIST)
+        if attribute is None:
+            return None
+        if not attribute.non_resident:
+            return attribute.content
+        return read_runs(
+            self.volume, self.boot.bytes_per_cluster, attribute.runs, 0, attribute.real_size
+        )
+
+    def _follow_attribute_list(self, record: MftRecord) -> MftRecord:
+        """Pull the attributes the list places in extension records into `record`."""
+        problems: List[str] = []
+        try:
+            content = self._attribute_list_content(record)
+        except OSError as error:
+            content = None
+            problems.append(f"$ATTRIBUTE_LIST could not be read: {error}")
+
+        if content is None:
+            record.attribute_list_problems = problems or ["$ATTRIBUTE_LIST flagged but not present"]
+            return record
+
+        wanted: Dict[int, set] = {}
+        for entry in parse_attribute_list(content):
+            if entry.record_number != record.record_number:
+                wanted.setdefault(entry.record_number, set()).add(
+                    (entry.type_id, entry.attribute_id)
+                )
+
+        gathered = list(record.attributes)
+        followed: List[int] = []
+
+        for number in sorted(wanted):
+            if number >= self.record_count:
+                problems.append(f"extension record {number} is beyond the end of $MFT")
+                continue
+            try:
+                extension = self.read(number, follow_attribute_list=False)
+            except (MftParseError, OSError) as error:
+                problems.append(f"extension record {number} unreadable: {error}")
+                continue
+
+            # The back-reference is the integrity check: a reused slot that now
+            # belongs to another file must not have its attributes grafted on.
+            if extension is None or extension.base_record != record.record_number:
+                problems.append(
+                    f"extension record {number} does not point back to base record "
+                    f"{record.record_number}; its attributes were not merged"
+                )
+                continue
+
+            keys = wanted[number]
+            gathered.extend(
+                a for a in extension.attributes if (a.type_id, a.attribute_id) in keys
+            )
+            followed.append(number)
+
+        record.attributes = merge_attribute_segments(gathered)
+        record.extension_records = followed
+        record.attribute_list_problems = problems
+        return record
 
 
 class BootSectorLike:

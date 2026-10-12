@@ -373,3 +373,50 @@ def test_findings_reference_back_to_their_records(case):
             continue
         entry = _by_record(case, finding["recordNumber"])
         assert finding["id"] in entry["findingIds"]
+
+
+# ---------------------------------------------------------------------------
+# Real-volume shapes: a fragmented $MFT and $ATTRIBUTE_LIST
+# ---------------------------------------------------------------------------
+
+
+def test_records_in_the_second_mft_extent_are_read_through_the_run_list(image_path, case):
+    # Record 16 lives in the second extent. Where a contiguous table would put
+    # it there is nothing but zeros — so finding it proves the extent map.
+    with open(image_path, "rb") as handle:
+        handle.seek(synthetic.MFT_START_CLUSTER * synthetic.BYTES_PER_CLUSTER + 16 * 1024)
+        assert handle.read(4) != b"FILE"
+    assert _by_record(case, 16)["fileName"] == "handover-credentials.txt"
+
+
+def test_attribute_list_file_is_reassembled_from_extension_records(case):
+    entry = _by_record(case, 21)
+    # $FILE_NAME lives only in extension record 22: unfollowed, the file has
+    # no name and is dropped entirely.
+    assert entry["fileName"] == "evidence.bin"
+    assert entry["filePath"] == "\\Docs\\evidence.bin"
+    # Size comes from the VCN-0 segment, the stream from both segments.
+    assert entry["size"] == len(synthetic.SPLIT_CONTENT)
+    default = next(s for s in entry["streams"] if s["name"] == "")
+    assert default["residency"] == "non-resident"
+
+
+def test_attribute_list_segments_join_in_vcn_order(case):
+    default = next(s for s in _by_record(case, 21)["streams"] if s["name"] == "")
+    assert default["hash"]["scope"] == "stream-content"
+    assert default["hash"]["value"] == hashlib.sha256(synthetic.SPLIT_CONTENT).hexdigest()
+
+
+def test_extension_records_are_not_files(case):
+    emitted = {entry["recordNumber"] for entry in case["files"]["entries"]}
+    assert 22 not in emitted and 23 not in emitted
+    # Nor are they counted as deleted files.
+    assert case["scan"]["mftRecordsDeleted"] == 4
+
+
+def test_followed_attribute_list_reports_no_error(case):
+    assert not [e for e in case["scan"]["errors"] if e["recordNumber"] == 21]
+
+
+def test_attribute_list_file_raises_no_finding(case):
+    assert _by_record(case, 21)["findingIds"] == []

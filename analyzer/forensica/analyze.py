@@ -157,21 +157,20 @@ def _build_entry(
         return None
 
     context.records_parsed += 1
+
+    # Extension records (those with a base) hold overflow attributes for their
+    # base record, which merges them in via $ATTRIBUTE_LIST. They are not files
+    # in their own right, so they count toward neither in-use nor deleted.
+    if record.base_record:
+        return None
+
     if record.in_use:
         context.records_in_use += 1
     else:
         context.records_deleted += 1
 
-    # Extension records (those with a base) are described by their base record.
-    if record.base_record:
-        return None
-
-    if record.has_attribute_list:
-        context.note_error(
-            "attribute",
-            number,
-            "record uses $ATTRIBUTE_LIST; attributes stored in extension records were not followed",
-        )
+    for problem in record.attribute_list_problems:
+        context.note_error("attribute", number, problem)
 
     si_attribute = record.first(ATTR_STANDARD_INFORMATION)
     if si_attribute is None or si_attribute.content is None:
@@ -775,7 +774,12 @@ def run_scan(
             entries[entry.record_number] = entry
 
         reporter.records("mft", "Parsing $MFT", limit, limit)
-        log(f"[*] parsed {context.records_parsed} records ({context.records_deleted} deleted)")
+        elapsed = max(time.monotonic() - started_monotonic, 1e-6)
+        log(
+            f"[*] parsed {context.records_parsed} records ({context.records_deleted} deleted) "
+            f"in {elapsed:.1f}s, {context.records_parsed / elapsed:,.0f} records/s, "
+            f"{reader.physical_reads} $MFT reads"
+        )
 
         reporter.stage("paths", f"Reconstructing paths for {len(entries)} records")
         _resolve_paths(entries, prefix)

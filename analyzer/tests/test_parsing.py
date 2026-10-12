@@ -21,16 +21,23 @@ from forensica.mft import (
     ATTR_STANDARD_INFORMATION,
     NAMESPACE_DOS,
     NAMESPACE_WIN32,
+    Attribute,
     FileNameAttribute,
+    MftReader,
     FixupError,
     apply_fixups,
     best_file_name,
     decode_attribute_flags,
     decode_data_runs,
+    merge_attribute_segments,
+    parse_attribute_list,
     parse_file_name,
     parse_record,
     parse_standard_information,
 )
+from forensica.volume import RawVolume
+
+from . import synthetic
 
 SECTOR = 512
 RECORD_SIZE = 1024
@@ -430,3 +437,108 @@ def test_parse_record_ignores_non_file_signature():
     record[0:4] = b"\x00\x00\x00\x00"
 
     assert parse_record(bytes(record), SECTOR) is None
+
+
+# ---------------------------------------------------------------------------
+# $ATTRIBUTE_LIST
+# ---------------------------------------------------------------------------
+
+
+def test_parse_attribute_list_decodes_location_of_each_attribute():
+    content = (
+        synthetic.attribute_list_entry(ATTR_FILE_NAME, 22, attribute_id=2)
+        + synthetic.attribute_list_entry(
+            ATTR_DATA, 23, attribute_id=5, starting_vcn=9, record_sequence=4, name="ads"
+        )
+    )
+    first, second = parse_attribute_list(content)
+
+    assert (first.type_id, first.record_number, first.attribute_id) == (ATTR_FILE_NAME, 22, 2)
+    assert second.name == "ads"
+    assert second.starting_vcn == 9
+    assert (second.record_number, second.record_sequence) == (23, 4)
+
+
+def test_parse_attribute_list_stops_on_a_corrupt_length():
+    good = synthetic.attribute_list_entry(ATTR_FILE_NAME, 22, attribute_id=2)
+    corrupt = bytearray(good)
+    struct.pack_into("<H", corrupt, 4, 0)  # zero length would loop forever
+
+    assert len(parse_attribute_list(good + bytes(corrupt))) == 1
+
+
+def test_merge_joins_segments_in_vcn_order_with_sizes_from_vcn_zero():
+    later = Attribute(ATTR_DATA, "", True, runs=[(47, 1)], lowest_vcn=1)
+    first = Attribute(
+        ATTR_DATA, "", True, runs=[(45, 1)], real_size=4196, allocated_size=8192, lowest_vcn=0
+    )
+    resident = Attribute(ATTR_FILE_NAME, "", False, content=b"x")
+
+    merged = merge_attribute_segments([resident, later, first])
+
+    assert [a.type_id for a in merged] == [ATTR_FILE_NAME, ATTR_DATA]
+    assert merged[1].runs == [(45, 1), (47, 1)]
+    assert merged[1].real_size == 4196
+
+
+def test_merge_keeps_differently_named_streams_apart():
+    default = Attribute(ATTR_DATA, "", True, runs=[(10, 1)])
+    ads = Attribute(ATTR_DATA, "payload", True, runs=[(20, 1)])
+
+    assert len(merge_attribute_segments([default, ads])) == 2
+
+
+# ---------------------------------------------------------------------------
+# MftReader against the synthetic image
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def reader(tmp_path):
+    image = synthetic.write_image(str(tmp_path / "synthetic.img"))
+    with RawVolume(image) as volume:
+        yield MftReader(volume, boot.parse(volume.read(0, 512)))
+
+
+def test_reader_buffers_a_sequential_scan_into_one_read(reader):
+    # The whole 32-record table fits in one chunk.
+    for number in range(reader.record_count):
+        reader.read(number)
+    assert reader.physical_reads == 1
+
+
+def test_reader_follows_attribute_list_into_extension_records(reader):
+    record = reader.read(21)
+
+    assert record.extension_records == [22, 23]
+    assert record.attribute_list_problems == []
+    assert record.first(ATTR_FILE_NAME) is not None
+    assert record.default_stream().runs == [(45, 1), (47, 1)]
+
+
+def test_reader_can_return_the_base_record_unfollowed(reader):
+    record = reader.read(21, follow_attribute_list=False)
+
+    assert record.has_attribute_list
+    assert record.first(ATTR_FILE_NAME) is None
+
+
+def test_extension_record_not_pointing_back_is_refused(tmp_path):
+    # Re-point extension record 23 at a different base, as happens when the
+    # slot is reused by another file after this one was deleted.
+    image = bytearray(synthetic.build_image())
+    extents = synthetic.MFT_EXTENTS
+    second_extent_start = extents[1][0] * synthetic.BYTES_PER_CLUSTER
+    first_extent_records = extents[0][1] * synthetic.RECORDS_PER_CLUSTER
+    offset = second_extent_start + (23 - first_extent_records) * RECORD_SIZE
+    struct.pack_into("<Q", image, offset + 0x20, 99 | (1 << 48))
+    path = tmp_path / "reused.img"
+    path.write_bytes(bytes(image))
+
+    with RawVolume(str(path)) as volume:
+        record = MftReader(volume, boot.parse(volume.read(0, 512))).read(21)
+
+    assert record.extension_records == [22]
+    assert any("does not point back" in problem for problem in record.attribute_list_problems)
+    # Only the first segment is trustworthy, so only it is used.
+    assert record.default_stream().runs == [(45, 1)]
